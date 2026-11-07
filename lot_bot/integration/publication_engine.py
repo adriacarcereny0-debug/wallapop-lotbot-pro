@@ -209,7 +209,7 @@ class PublicationEngine:
         if not self.client.can_publish_directly:
             raise ValueError(
                 "La publicación directa no usa el navegador. En «Conectar Wallapop» elige "
-                "«Credencial provisional» o «API oficial» (o «Demostración» para probar)."
+                "la conexión por credencial (token) (o «Demostración» para probar)."
             )
         missing = [m for m in self.client.missing_configuration()
                    if not m.startswith("Operación no autorizada")]

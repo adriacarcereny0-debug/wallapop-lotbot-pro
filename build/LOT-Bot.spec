@@ -22,7 +22,6 @@ ICON = PROJECT_ROOT / "lot_bot" / "resources" / "lot_bot.ico"
 # --- Datos que deben viajar dentro del ejecutable ---
 datas = [
     (str(PROJECT_ROOT / "config" / "access_profile.example.yaml"), "config"),
-    (str(PROJECT_ROOT / "config" / "official_api.example.yaml"), "config"),
     (str(PROJECT_ROOT / ".env.example"), "."),
 ]
 resources = PROJECT_ROOT / "lot_bot" / "resources"

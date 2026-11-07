@@ -2,8 +2,9 @@
 
 Esta versión de LOT Bot añade un **motor de publicación que no abre ni
 controla ningún navegador**. Habla directamente con el servicio autorizado
-por Wallapop, con la credencial de integración provisional que Wallapop
-emita hoy y, sin reconstruir nada, con la **API oficial** cuando se conceda.
+por Wallapop con la **credencial (token) de integración** que Wallapop emite
+para cada cuenta. Es la única forma de conexión directa de este repositorio:
+la integración con la API oficial se desarrolla en otro repositorio.
 
 El sistema anterior (navegador) **sigue disponible** y no se ha eliminado:
 «Cuentas de Wallapop» y «Publicación automática» funcionan igual que antes.
@@ -22,16 +23,17 @@ La conclusión fue **reutilizar** la capa autorizada por HTTP (que ya cumplía
 la regla «no inventar endpoints») y construir encima un motor independiente
 del navegador, en lugar de reescribir la aplicación.
 
-## Mecanismos autorizados (y lo que NO se hace)
+## Mecanismo: solo credencial (token)
 
-LOT Bot solo usa lo que Wallapop declare en el perfil de acceso:
+La conexión directa admite un único mecanismo, `delegated_credential`: la
+credencial (token) que Wallapop emite para cada cuenta. El cliente la pega en
+«Conectar Wallapop». Si Wallapop documenta una página para obtenerla
+(transferencia manual), se declara en `portal_url` y el botón «Iniciar
+conexión» la abre en el navegador habitual del cliente.
 
-* **Credencial de integración provisional** (`delegated_credential`): el
-  cliente la pega en «Conectar Wallapop». Si Wallapop documenta una página
-  para obtenerla (transferencia manual), se declara en `portal_url` y el
-  botón «Iniciar conexión» la abre en el navegador habitual del cliente.
-* **OAuth** (`oauth`): previsiblemente, la API oficial.
-* **Inicio de sesión autorizado** (`session_handoff`).
+Si el perfil declara otro mecanismo (`oauth`, `session_handoff`) y se activa
+la conexión directa, LOT Bot se queda en DEMO y explica que solo admite
+`delegated_credential` (prueba `test_la_conexion_directa_solo_admite_token`).
 
 Lo que **no** hace, por diseño: no extrae cookies ni credenciales del
 navegador, no usa tokens internos ni endpoints no declarados, no automatiza
@@ -53,16 +55,16 @@ Pantalla «Conectar Wallapop»         Pantalla «Publicación masiva»
             │                          │        │
             ▼                          ▼        ▼
      AccountManager (cifrado)   DatabaseManager   WallapopService (factory.py)
-                                     │                 ├─ MockWallapopService      (demo)
-                                     ▼                 ├─ AuthorizedWallapopService (perfil)
-                                  SQLite               └─ AuthorizedWallapopService (oficial)
+                                     │                 ├─ MockWallapopService       (demo)
+                                     ▼                 └─ AuthorizedWallapopService (credencial/token)
+                                  SQLite
 ```
 
 Todo vive en `lot_bot/integration/`, un fichero por módulo:
 
 | Módulo | Fichero | Responsabilidad |
 |---|---|---|
-| `AuthenticationManager` | `auth_manager.py` | Iniciar conexión, credencial provisional, validar, comprobar, renovar, reconectar, desconectar, historial |
+| `AuthenticationManager` | `auth_manager.py` | Iniciar conexión, credencial (token), validar, comprobar, renovar, reconectar, desconectar, historial |
 | `WallapopClient` | `wallapop_client.py` | Única puerta hacia Wallapop: límite de peticiones/minuto, clasificación de errores, idempotencia, búsqueda de anuncios ya publicados |
 | `PublicationEngine` | `publication_engine.py` | Hilo que publica la cola de uno en uno, con intervalo mínimo, máximo diario y recuperación |
 | `QueueManager` | `queue_manager.py` | Cola persistente, duplicados, CSV, estados, historial, recuperación tras cierre |
@@ -150,24 +152,37 @@ limits:
 * El máximo diario efectivo es el menor entre el declarado y el del usuario.
 * El intervalo cuenta también las publicaciones del sistema anterior.
 
-## Transición a la API oficial
+## Configurar la credencial (token)
 
-El proveedor provisional y la API oficial usan **el mismo código**: solo
-cambia el perfil.
+1. Copia `config/access_profile.example.yaml` a `config/access_profile.local.yaml`.
+2. Rellénalo con lo que indique Wallapop:
 
-1. Copia `config/official_api.example.yaml` a `config/official_api.local.yaml`
-   (o apunta `WALLAPOP_OFFICIAL_PROFILE` a otro sitio).
-2. Rellénalo con la documentación oficial: normalmente `auth.method: oauth`
-   con sus URL y `client_id` (en `.env`), `api.base_url`, `operations:` y
-   `limits:`.
-3. En LOT Bot: **Conectar Wallapop → API oficial de Wallapop → Usar este
-   tipo**, y conecta cada cuenta (Iniciar conexión → autorizar en Wallapop).
+```yaml
+auth:
+  method: "delegated_credential"
+  delegated_credential:
+    header_name: "Authorization"
+    header_format: "Bearer {credential}"
+    instructions: "Cómo obtiene el cliente su credencial."
+    portal_url: ""          # página documentada por Wallapop, si existe
+api:
+  base_url: "<la que indique Wallapop>"
+operations:
+  account_profile: { ... }  # para validar la credencial
+  create_item: { ... }      # imprescindible para publicar
+  upload_image: { ... }     # opcional
+  list_items: { ... }       # opcional: recuperar interrupciones sin duplicar
+limits: { ... }
+```
 
-La cola, el historial y los anuncios pendientes se conservan: lo que quedara
-en cola se publica con la API oficial. Si la API oficial necesitara algo que
-el perfil no pueda expresar, se escribe una subclase de `WallapopService` y
-se registra en `wallapop/factory.py`; `WallapopClient` y todo lo que hay
-encima no cambian.
+3. Deja el fichero en la carpeta `config/` junto a `LOT-Bot.exe` (o apunta
+   `WALLAPOP_ACCESS_PROFILE` a él). No hay que recompilar.
+4. En LOT Bot: **Conectar Wallapop → Activar conexión por credencial**.
+
+La API oficial no forma parte de este repositorio. `WallapopClient` aísla al
+motor, a la cola y a la interfaz del servicio concreto, por lo que una futura
+implementación de `WallapopService` se puede registrar en
+`wallapop/factory.py` sin cambiar nada de lo que hay encima.
 
 ## Pruebas
 

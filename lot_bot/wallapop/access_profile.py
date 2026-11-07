@@ -94,9 +94,8 @@ class AccessProfile:
     authorization_ref: str = ""
     notes: str = ""
     source_path: Path | None = None
-    #: «provisional» (credencial de integración autorizada) u «oficial» (API
-    #: oficial de Wallapop). Solo documental: el comportamiento lo decide el
-    #: contenido del perfil, no esta etiqueta.
+    #: Etiqueta documental (p. ej. «provisional»). El comportamiento lo decide
+    #: el contenido del perfil, no esta etiqueta.
     provider: str = ""
     limits: UsageLimits = field(default_factory=UsageLimits)
 

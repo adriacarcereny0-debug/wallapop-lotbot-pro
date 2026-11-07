@@ -23,6 +23,7 @@ from lot_bot.config.settings import Settings
 from lot_bot.wallapop.access_profile import AccessProfile, empty_profile
 from lot_bot.wallapop.account_manager import AccountManager
 from lot_bot.wallapop.auth import AuthMethod, DemoAuthMethod, build_auth_method
+from lot_bot.wallapop.auth.base import AuthKind
 from lot_bot.wallapop.authorized_service import AuthorizedWallapopService
 from lot_bot.wallapop.capabilities import Capability
 from lot_bot.wallapop.mock_service import MockWallapopService
@@ -43,8 +44,7 @@ class WallapopBackend:
     #: Lista concreta de lo que falta para poder conectar de verdad.
     missing: list[str] = field(default_factory=list)
 
-    #: «demo», «navegador», «perfil» (conexión directa provisional) u
-    #: «oficial» (API oficial de Wallapop).
+    #: «demo», «navegador» o «perfil» (conexión directa por credencial/token).
     provider: str = "demo"
 
     @property
@@ -53,14 +53,12 @@ class WallapopBackend:
             return "MODO DEMO"
         if self.auth_method.kind.value == "browser_session":
             return "WALLAPOP (NAVEGADOR)"
-        if self.provider == INTEGRATION_OFFICIAL:
-            return "WALLAPOP · API OFICIAL"
         return "WALLAPOP REAL"
 
     @property
     def is_direct(self) -> bool:
         """True si las peticiones van directas al servicio (sin navegador)."""
-        return not self.demo and self.provider in (INTEGRATION_PROFILE, INTEGRATION_OFFICIAL)
+        return not self.demo and self.provider == INTEGRATION_PROFILE
 
     @property
     def uses_browser(self) -> bool:
@@ -89,13 +87,11 @@ def _demo_backend(reason: str, missing: list[str] | None = None) -> WallapopBack
 
 
 INTEGRATION_BROWSER = "navegador"
-#: Conexión directa con la credencial de integración provisional autorizada.
+#: Conexión directa con la credencial (token) de integración autorizada.
 INTEGRATION_PROFILE = "perfil"
-#: Conexión directa con la API oficial de Wallapop (mismo motor, otro perfil).
-INTEGRATION_OFFICIAL = "oficial"
 INTEGRATION_DEMO = "demo"
 #: Modos que se pueden elegir desde la aplicación.
-INTEGRATION_MODES = (INTEGRATION_DEMO, INTEGRATION_PROFILE, INTEGRATION_OFFICIAL, INTEGRATION_BROWSER)
+INTEGRATION_MODES = (INTEGRATION_DEMO, INTEGRATION_PROFILE, INTEGRATION_BROWSER)
 
 
 def _browser_backend(
@@ -189,7 +185,6 @@ def build_backend(
     if settings.demo_mode and chosen not in (
         INTEGRATION_BROWSER,
         INTEGRATION_PROFILE,
-        INTEGRATION_OFFICIAL,
     ):
         return _demo_backend("Modo DEMO activado en la configuración.")
 
@@ -200,17 +195,11 @@ def build_backend(
     if chosen == INTEGRATION_DEMO:
         return _demo_backend("Modo DEMO elegido en «Conectar Wallapop».")
 
-    # --- 2. Perfil de acceso (provisional u oficial: mismo formato) ---
-    official = chosen == INTEGRATION_OFFICIAL
-    provider = INTEGRATION_OFFICIAL if official else INTEGRATION_PROFILE
-    if official:
-        profile_path = settings.official_profile_path
-        variable, example = "WALLAPOP_OFFICIAL_PROFILE", "config/official_api.example.yaml"
-        what = "de la API oficial de Wallapop"
-    else:
-        profile_path = settings.access_profile_path
-        variable, example = "WALLAPOP_ACCESS_PROFILE", "config/access_profile.example.yaml"
-        what = "de acceso autorizado"
+    # --- 2. Perfil de acceso ---
+    provider = INTEGRATION_PROFILE
+    profile_path = settings.access_profile_path
+    variable, example = "WALLAPOP_ACCESS_PROFILE", "config/access_profile.example.yaml"
+    what = "de acceso autorizado"
     if profile_path is None:
         return _demo_backend(
             f"No se ha indicado ningún perfil {what}.",
@@ -235,6 +224,17 @@ def build_backend(
             "El perfil de acceso está incompleto: LOT Bot se mantiene en modo DEMO "
             "para no simular una conexión real.",
             missing,
+        )
+
+    # --- 3b. Conexión directa elegida en «Conectar Wallapop»: solo token ---
+    if chosen == INTEGRATION_PROFILE and profile.auth.method is not AuthKind.DELEGATED_CREDENTIAL:
+        declared = profile.auth.method.value if profile.auth.method else "(ninguno)"
+        return _demo_backend(
+            "La conexión directa solo admite la credencial (token) de integración.",
+            [
+                "El perfil de acceso debe declarar auth.method: \"delegated_credential\" "
+                f"(ahora declara: {declared})."
+            ],
         )
 
     # --- 4. El mecanismo de autenticacion debe estar listo ---
@@ -282,8 +282,7 @@ def build_backend(
         demo=False,
         provider=provider,
         reason=(
-            ("API oficial de Wallapop: " if official else "")
-            + f"Acceso autorizado activo mediante «{auth_method.describe()}» "
+            f"Acceso autorizado activo mediante «{auth_method.describe()}» "
             f"({len(granted)} operaciones disponibles)."
         ),
         missing=[

@@ -37,13 +37,8 @@ from lot_bot.ui.widgets.common import (
     show_error,
 )
 
-#: (texto para el cliente, modo interno)
-CONNECTION_TYPES = [
-    ("Demostración (no se conecta a Wallapop)", "demo"),
-    ("Credencial provisional autorizada por Wallapop", "perfil"),
-    ("API oficial de Wallapop", "oficial"),
-    ("Navegador (sistema anterior)", "navegador"),
-]
+#: Único tipo de conexión de esta pantalla: credencial (token) de integración.
+TOKEN_MODE = "perfil"
 
 AUTH_BADGE = {
     "connected": "connected",
@@ -94,15 +89,17 @@ class ConnectWallapopView(BaseView):
 
         # --- 1. Tipo de conexión -------------------------------------------
         mode_card = Card()
-        mode_card.add(SectionTitle("1 · Tipo de conexión"))
+        mode_card.add(SectionTitle("1 · Tipo de conexión: credencial (token) de Wallapop"))
         row = QHBoxLayout()
-        self.mode_combo = QComboBox()
-        for label, value in CONNECTION_TYPES:
-            self.mode_combo.addItem(label, value)
-        row.addWidget(self.mode_combo, 1)
-        self.mode_button = QPushButton("Usar este tipo")
+        self.mode_button = QPushButton("Activar conexión por credencial")
+        self.mode_button.setObjectName("Primary")
+        self.mode_button.setToolTip(
+            "Publica directamente con la credencial (token) que Wallapop emite para "
+            "cada cuenta, sin navegador."
+        )
         self.mode_button.clicked.connect(self._apply_mode)
         row.addWidget(self.mode_button)
+        row.addStretch(1)
         mode_card.body.addLayout(row)
         self.mode_info = QLabel()
         self.mode_info.setWordWrap(False)
@@ -187,7 +184,7 @@ class ConnectWallapopView(BaseView):
         self.check_button.clicked.connect(self._check)
         row.addWidget(self.check_button)
         self.renew_button = QPushButton("Renovar")
-        self.renew_button.setToolTip("Renueva la conexión sin volver a introducir datos, si se puede.")
+        self.renew_button.setToolTip("Sustituye la credencial por la nueva que te dé Wallapop.")
         self.renew_button.clicked.connect(self._renew)
         row.addWidget(self.renew_button)
         self.reconnect_button = QPushButton("Reconectar")
@@ -229,10 +226,9 @@ class ConnectWallapopView(BaseView):
 
     def refresh(self) -> None:
         backend = self.app.backend
-        current_mode = "demo" if backend.demo else backend.provider
-        index = self.mode_combo.findData(current_mode)
-        if index >= 0 and not self.mode_combo.hasFocus():
-            self.mode_combo.setCurrentIndex(index)
+        chosen = self.app.settings.wallapop_integration or self.app.integration_mode
+        active = chosen == TOKEN_MODE
+        self.mode_button.setVisible(not active)
         client = self.app.wallapop_client
         lines = [f"<b>Activo:</b> {client.provider_label}"]
         if backend.reason:
@@ -277,7 +273,7 @@ class ConnectWallapopView(BaseView):
                        self.renew_button, self.reconnect_button, self.disconnect_button):
             button.setEnabled(ref is not None)
         self.start_button.setEnabled(ref is not None and procedure.ready)
-        self.renew_button.setEnabled(ref is not None and procedure.can_renew)
+        self.renew_button.setEnabled(ref is not None and procedure.needs_credential)
 
         if ref is None:
             for label in self.fields.values():
@@ -333,9 +329,8 @@ class ConnectWallapopView(BaseView):
             update()
 
     def _apply_mode(self) -> None:
-        mode = self.mode_combo.currentData()
         try:
-            self.app.set_integration_mode(mode)
+            self.app.set_integration_mode(TOKEN_MODE)
         except Exception as exc:  # perfil con errores, etc.
             show_error(self, getattr(exc, "user_message", None) or str(exc))
         self.refresh()
@@ -401,8 +396,21 @@ class ConnectWallapopView(BaseView):
             self._run(self._auth.check, self._ref())
 
     def _renew(self) -> None:
-        if self._ref():
-            self._run(self._auth.renew, self._ref())
+        """Renovar = sustituir la credencial por la nueva que dé Wallapop."""
+        ref = self._ref()
+        if not ref:
+            return
+        value = self.credential.text()
+        if not value.strip():
+            self.credential.setFocus()
+            show_error(
+                self,
+                "Pega la nueva credencial (token) en «Credencial de integración» y "
+                "vuelve a pulsar «Renovar».",
+            )
+            return
+        self.credential.clear()
+        self._run(self._auth.submit_credential, ref, value)
 
     def _reconnect(self) -> None:
         if self._ref():

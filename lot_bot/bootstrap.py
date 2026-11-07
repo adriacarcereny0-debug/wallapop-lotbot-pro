@@ -182,8 +182,8 @@ class Application:
         return load_integration_mode(self.db)
 
     def set_integration_mode(self, mode: str) -> WallapopBackend:
-        """«navegador», «perfil» (conexión directa provisional), «oficial»
-        (API oficial) o «demo». Se guarda en local."""
+        """«perfil» (conexión directa por credencial/token), «navegador» o
+        «demo». Se guarda en local."""
         from lot_bot.wallapop.factory import INTEGRATION_MODES
 
         if mode not in INTEGRATION_MODES:

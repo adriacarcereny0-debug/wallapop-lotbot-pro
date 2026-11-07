@@ -110,3 +110,16 @@ def test_la_ventana_principal_abre_las_pantallas_nuevas(qt_app, app_with_data):
     assert type(ventana.stack.currentWidget()).__name__ == "DirectPublishView"
     assert "Cola:" in ventana.status_label.text()
     ventana.close()
+
+
+def test_conectar_wallapop_solo_ofrece_token(qt_app, app, silent_dialogs, monkeypatch):
+    from lot_bot.ui.views.connect_wallapop import ConnectWallapopView
+    from lot_bot.ui.widgets.workers import TaskRunner
+
+    view = ConnectWallapopView(app, TaskRunner(1))
+    assert not hasattr(view, "mode_combo")
+    view.refresh()
+    assert not view.mode_button.isHidden()  # en DEMO se ofrece activar el token
+    view._apply_mode()
+    assert app.integration_mode == "perfil"
+    assert view.mode_button.isHidden()

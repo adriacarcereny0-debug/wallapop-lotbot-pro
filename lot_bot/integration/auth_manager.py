@@ -12,7 +12,8 @@ QUÉ HACE Y QUÉ NO HACE
 ----------------------
 * Usa el mecanismo que Wallapop haya autorizado y que esté declarado en el
   perfil: credencial de integración provisional (transferencia manual
-  documentada), OAuth o inicio de sesión autorizado. Mañana, la API oficial.
+  documentada) declarada en el perfil de acceso. Es el único mecanismo de
+  la conexión directa.
 * La credencial se guarda cifrada (lo hace `AccountManager`) y nunca se
   muestra, ni se escribe en los logs, ni llega a la IA.
 * NO extrae cookies ni credenciales del navegador, NO usa tokens internos,
@@ -254,7 +255,7 @@ class AuthenticationManager:
         if not self._client.can_publish_directly:
             return ConnectionResult(
                 False,
-                "Elige «Credencial provisional» o «API oficial» en «Tipo de conexión»: "
+                "Activa la conexión por credencial (token) en «Tipo de conexión»: "
                 "la conexión directa no usa el navegador.",
             )
         if not procedure.ready:
@@ -289,14 +290,9 @@ class AuthenticationManager:
                 awaiting_credential=True,
             )
 
-        # OAuth / inicio de sesión autorizado: el mecanismo abre el navegador
-        # del sistema y espera el retorno (sin automatizar nada).
-        outcome = self._accounts.connect(account_ref)
-        if not outcome.success:
-            return self._failed(account_ref, outcome.message)
-        self._set_state(account_ref, AuthState.CONNECTED, connected=True)
-        self._event(account_ref, "connected", True, outcome.message)
-        return self.validate(account_ref)
+        return ConnectionResult(
+            False, "La conexión directa solo admite la credencial (token) de integración."
+        )
 
     def submit_credential(self, account_ref: str, credential: str) -> ConnectionResult:
         """Paso 2. Guarda (cifrada) la credencial provisional y la valida."""

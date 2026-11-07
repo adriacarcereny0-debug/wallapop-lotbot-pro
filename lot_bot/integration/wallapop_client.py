@@ -4,20 +4,12 @@ Es la única pieza del motor de publicación que habla con Wallapop. Por debajo
 usa el `WallapopService` que elige `wallapop/factory.py`:
 
     demo       -> MockWallapopService            (datos simulados)
-    perfil     -> AuthorizedWallapopService      (credencial provisional autorizada)
-    oficial    -> AuthorizedWallapopService      (API oficial de Wallapop)
+    perfil     -> AuthorizedWallapopService      (credencial / token autorizado)
 
-PREPARADO PARA LA API OFICIAL
------------------------------
-El proveedor provisional y la API oficial usan EXACTAMENTE el mismo código:
-la diferencia está en el perfil YAML (qué URL, qué operaciones, cómo se
-autentica, qué límites). Cuando Wallapop conceda la API oficial basta con
-rellenar `config/official_api.local.yaml` y elegir «API oficial» en
-«Conectar Wallapop». El motor, la cola, las fotos y la interfaz no cambian.
-
-Si algún día la API oficial necesitara algo que el perfil no puede expresar,
-se implementa una subclase de `WallapopService` y se registra en la
-factoría: este cliente y todo lo que hay encima siguen igual.
+La conexión directa usa ÚNICAMENTE la credencial (token) de integración que
+Wallapop emita para cada cuenta. Qué URL, qué operaciones y qué límites se
+usan lo declara el perfil YAML (`config/access_profile.local.yaml`), no el
+código.
 
 Lo que añade este cliente sobre el servicio:
 
@@ -64,8 +56,7 @@ logger = logging.getLogger(__name__)
 
 PROVIDER_LABELS = {
     "demo": "Modo demostración (simulado)",
-    "perfil": "Conexión directa · credencial de integración provisional",
-    "oficial": "Conexión directa · API oficial de Wallapop",
+    "perfil": "Conexión directa · credencial (token) de integración",
     "navegador": "Navegador (sistema anterior)",
 }
 
@@ -123,9 +114,6 @@ class ConnectionProcedure:
     documentation_url: str = ""
     #: True si la pantalla debe mostrar el campo «Credencial de integración».
     needs_credential: bool = False
-    #: True si «Iniciar conexión» lanza un flujo en el navegador del sistema
-    #: (OAuth o inicio de sesión autorizado) y espera el retorno.
-    opens_authorization_flow: bool = False
     ready: bool = True
     missing: list[str] = field(default_factory=list)
     can_renew: bool = False
@@ -207,7 +195,7 @@ class WallapopClient:
 
     @property
     def is_direct(self) -> bool:
-        """Conexión directa (provisional u oficial): sin navegador."""
+        """Conexión directa por credencial (token): sin navegador."""
         return bool(getattr(self.backend, "is_direct", False))
 
     @property
@@ -277,36 +265,12 @@ class WallapopClient:
                 missing=missing,
                 can_renew=False,
             )
-        if kind is AuthKind.OAUTH:
+        if kind is not AuthKind.BROWSER_SESSION:
             return ConnectionProcedure(
                 method=kind.value,
-                title="Autorización oficial de Wallapop (OAuth)",
-                steps=[
-                    "Pulsa «Iniciar conexión»: se abre Wallapop en tu navegador habitual.",
-                    "Inicia sesión allí y acepta los permisos que pide LOT Bot.",
-                    "Vuelve a LOT Bot: la conexión se valida sola.",
-                ],
-                opens_authorization_flow=True,
-                ready=method.is_ready,
-                missing=missing,
-                can_renew=True,
-            )
-        if kind is AuthKind.SESSION_HANDOFF:
-            config = method.config
-            steps = [
-                "Pulsa «Iniciar conexión»: se abre la página de acceso que Wallapop ha autorizado.",
-                "Inicia sesión allí con todos los pasos que pida Wallapop.",
-                "Al terminar, Wallapop devuelve la sesión a LOT Bot y se valida sola.",
-            ]
-            if config.instructions:
-                steps.insert(0, config.instructions)
-            return ConnectionProcedure(
-                method=kind.value,
-                title="Inicio de sesión autorizado",
-                steps=steps,
-                opens_authorization_flow=True,
-                ready=method.is_ready,
-                missing=missing,
+                title=method.describe(),
+                ready=False,
+                missing=["La conexión directa solo admite la credencial (token) de integración."],
             )
         if kind is AuthKind.BROWSER_SESSION:
             return ConnectionProcedure(
@@ -314,7 +278,7 @@ class WallapopClient:
                 title="Navegador (sistema anterior)",
                 steps=[
                     "Este modo controla un navegador. La publicación masiva directa no lo usa.",
-                    "Elige «Credencial provisional» o «API oficial» arriba para publicar sin navegador.",
+                    "Activa arriba la conexión por credencial (token) para publicar sin navegador.",
                 ],
                 ready=False,
                 missing=["La publicación directa no funciona en modo navegador."],

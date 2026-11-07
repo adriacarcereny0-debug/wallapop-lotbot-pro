@@ -195,55 +195,38 @@ def test_conexion_directa_usa_el_proveedor_provisional(direct):
     assert direct.backend.provider == "perfil"
     assert direct.wallapop_client.is_direct
     assert not direct.wallapop_client.uses_browser
+    assert direct.backend.label == "WALLAPOP REAL"
     proc = direct.auth_manager.procedure()
     assert proc.needs_credential
     assert proc.portal_url == "https://integraciones.prueba/credencial"
     assert proc.ready
 
 
-def test_api_oficial_mismo_motor_otro_perfil(database, temp_paths, tmp_path):
-    """Cambiar a la API oficial es cambiar de fichero, no de programa."""
+def test_la_conexion_directa_solo_admite_token(database, temp_paths, tmp_path):
+    """En «Conectar Wallapop» solo existe la credencial (token)."""
     from lot_bot.bootstrap import create_application
     from lot_bot.config.settings import Settings
 
-    official = dict(PROFILE, meta={"provider": "oficial"},
-                    limits={"min_seconds_between_publications": 90,
-                            "idempotency_header": "Idempotency-Key"})
-    path = _write_profile(tmp_path, official, "official_api.local.yaml")
+    oauth = dict(PROFILE, auth={"method": "oauth", "oauth": {
+        "authorize_url": "https://auth.prueba/a", "token_url": "https://auth.prueba/t"}})
+    path = _write_profile(tmp_path, oauth)
     settings = Settings(LOT_BOT_DEMO_MODE=False, LOT_BOT_AI_PROVIDER="rules",
-                        LOT_BOT_LOG_LEVEL="WARNING", WALLAPOP_OFFICIAL_PROFILE=str(path),
-                        LOT_BOT_WALLAPOP_INTEGRATION="oficial")
-    app = create_application(settings=settings, database=database, start_scheduler=False)
-    try:
-        assert app.backend.provider == "oficial"
-        assert app.backend.label == "WALLAPOP · API OFICIAL"
-        assert app.wallapop_client.supports_idempotency
-        assert app.publication_engine.minimum_interval == 90
-        server = FakeWallapop()
-        _attach(app, server)
-        app.direct.engine.clock = FakeClock()
-        ref = _connected_account(app)
-        app.queue_manager.add(_ad(ref))
-        app.publication_engine.start()
-        app.publication_engine.run_until_idle()
-        create = [r for r in server.requests if r.method == "POST" and r.url.path == "/items"]
-        assert create and create[0].headers.get("Idempotency-Key")
-    finally:
-        app.automations.shutdown()
-
-
-def test_api_oficial_sin_perfil_explica_que_falta(database, temp_paths):
-    from lot_bot.bootstrap import create_application
-    from lot_bot.config.settings import Settings
-
-    settings = Settings(LOT_BOT_DEMO_MODE=False, LOT_BOT_AI_PROVIDER="rules",
-                        LOT_BOT_LOG_LEVEL="WARNING", LOT_BOT_WALLAPOP_INTEGRATION="oficial")
+                        LOT_BOT_LOG_LEVEL="WARNING", WALLAPOP_ACCESS_PROFILE=str(path),
+                        LOT_BOT_WALLAPOP_INTEGRATION="perfil")
     app = create_application(settings=settings, database=database, start_scheduler=False)
     try:
         assert app.demo_mode
-        assert any("WALLAPOP_OFFICIAL_PROFILE" in m for m in app.missing_access_data)
+        assert any("delegated_credential" in m for m in app.missing_access_data)
     finally:
         app.automations.shutdown()
+
+
+def test_no_hay_opcion_de_api_oficial():
+    from lot_bot.wallapop.factory import INTEGRATION_MODES
+
+    assert "oficial" not in INTEGRATION_MODES
+    raiz = Path(__file__).resolve().parents[1]
+    assert not (raiz / "config" / "official_api.example.yaml").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -601,17 +584,15 @@ def test_database_manager_integridad_y_ajustes(app):
     assert db.get_setting("prueba") == {"a": 1}
 
 
-def test_el_perfil_oficial_de_ejemplo_no_concede_acceso():
-    """La plantilla de la API oficial está vacía: no inventa nada de Wallapop."""
+def test_el_perfil_de_ejemplo_no_concede_acceso_ni_limites():
+    """La plantilla está vacía: no inventa nada de Wallapop."""
     from lot_bot.wallapop.access_profile import AccessProfile
 
     raiz = Path(__file__).resolve().parents[1]
-    for nombre in ("official_api.example.yaml", "access_profile.example.yaml"):
-        perfil = AccessProfile.load(raiz / "config" / nombre)
-        assert not perfil.has_auth and not perfil.has_transport, nombre
-        assert perfil.limits.min_seconds_between_publications is None
-        assert perfil.limits.max_images_per_item == 10
-    assert AccessProfile.load(raiz / "config" / "official_api.example.yaml").provider == "oficial"
+    perfil = AccessProfile.load(raiz / "config" / "access_profile.example.yaml")
+    assert not perfil.has_auth and not perfil.has_transport
+    assert perfil.limits.min_seconds_between_publications is None
+    assert perfil.limits.max_images_per_item == 10
 
 
 def test_limites_del_perfil_se_leen_y_validan():
@@ -681,3 +662,29 @@ def test_cuenta_demo_no_publica_en_wallapop_real(direct):
     assert direct.publication_engine.run_until_idle() == 0
     assert direct.server.items == []
     assert direct.auth_manager.status(demo.internal_ref).auth_state is AuthState.NOT_CONNECTED
+
+
+def test_idempotencia_si_el_perfil_la_declara(database, temp_paths, tmp_path):
+    from lot_bot.bootstrap import create_application
+    from lot_bot.config.settings import Settings
+
+    perfil = dict(PROFILE, limits={"min_seconds_between_publications": 90,
+                                   "idempotency_header": "Idempotency-Key"})
+    path = _write_profile(tmp_path, perfil)
+    settings = Settings(LOT_BOT_DEMO_MODE=False, LOT_BOT_AI_PROVIDER="rules",
+                        LOT_BOT_LOG_LEVEL="WARNING", WALLAPOP_ACCESS_PROFILE=str(path),
+                        LOT_BOT_WALLAPOP_INTEGRATION="perfil")
+    app = create_application(settings=settings, database=database, start_scheduler=False)
+    try:
+        assert app.publication_engine.minimum_interval == 90
+        server = FakeWallapop()
+        _attach(app, server)
+        app.direct.engine.clock = FakeClock()
+        ref = _connected_account(app)
+        app.queue_manager.add(_ad(ref))
+        app.publication_engine.start()
+        app.publication_engine.run_until_idle()
+        create = [r for r in server.requests if r.method == "POST" and r.url.path == "/items"]
+        assert create and create[0].headers.get("Idempotency-Key")
+    finally:
+        app.automations.shutdown()

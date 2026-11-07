@@ -33,7 +33,7 @@
 
 meta:
   # Documental: de quién procede la autorización y su referencia.
-  # provider: "provisional" (credencial de integración) u "oficial" (API oficial)
+  # provider: "provisional" (credencial/token de integración)
   provider: "provisional"
   authorized_by: ""
   authorization_ref: ""

@@ -4,7 +4,7 @@ Seis piezas independientes, cada una con una sola responsabilidad:
 
 =====================  ===================================================
 AuthenticationManager  Conectar, validar, comprobar, renovar y desconectar
-WallapopClient         Única puerta hacia Wallapop (provisional u oficial)
+WallapopClient         Única puerta hacia Wallapop (credencial / token)
 PublicationEngine      Publica la cola en orden, con límites y recuperación
 QueueManager           Cola persistente, duplicados, historial, CSV
 ImageManager           Valida, deduplica y sube las fotografías

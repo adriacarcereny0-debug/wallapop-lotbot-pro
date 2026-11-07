@@ -5,8 +5,8 @@ comunica directamente con Wallapop usando el acceso que Wallapop te haya
 autorizado. Solo necesitas dos pantallas: **Conectar Wallapop** y
 **Publicación masiva**.
 
-> El sistema anterior (con navegador) sigue estando en «Cuentas de Wallapop»
-> y «Publicación automática». No hace falta que lo uses.
+> El sistema anterior (con navegador) sigue estando en «Cuentas de Wallapop»,
+> «Publicación automática» y «Configuración». No hace falta que lo uses.
 
 ---
 
@@ -16,14 +16,9 @@ Abre **Conectar Wallapop** en el menú de la izquierda.
 
 ### 1. Tipo de conexión
 
-Elige uno y pulsa **Usar este tipo**:
-
-| Opción | Cuándo |
-|---|---|
-| **Demostración** | Para probar. No se envía nada a Wallapop |
-| **Credencial provisional autorizada por Wallapop** | La que usarás ahora, mientras llega la API oficial |
-| **API oficial de Wallapop** | Cuando Wallapop conceda el acceso oficial |
-| **Navegador (sistema anterior)** | Solo si quieres seguir con el sistema de antes |
+LOT Bot se conecta con la **credencial (token)** que Wallapop te da para cada
+cuenta. Si arriba aparece el botón **Activar conexión por credencial**,
+púlsalo una vez.
 
 Si falta algo para poder conectar, aparece debajo en naranja, con lo que
 falta exactamente. Normalmente lo prepara tu técnico una sola vez.
@@ -39,8 +34,7 @@ Elige la cuenta o pulsa **Añadir cuenta** y ponle un nombre que reconozcas
 
 ### 3. Conectar
 
-Sigue los pasos numerados que aparecen en pantalla. Con la credencial
-provisional son:
+Sigue los pasos numerados que aparecen en pantalla. Son:
 
 1. Pulsa **Iniciar conexión**. Si Wallapop tiene una página para obtener la
    credencial, se abre en tu navegador habitual.
@@ -53,7 +47,7 @@ Otros botones:
 | Botón | Qué hace |
 |---|---|
 | **Comprobar estado** | Pregunta a Wallapop si la conexión sigue activa |
-| **Renovar** | Renueva la conexión sin pedirte nada (solo si el tipo de conexión lo permite) |
+| **Renovar** | Cambia la credencial por la nueva que te dé Wallapop: pégala en el campo y pulsa Renovar |
 | **Reconectar** | Vuelve a conectar, por ejemplo con una credencial nueva |
 | **Desconectar** | Borra la credencial de este ordenador. Los anuncios pendientes no se pierden |
 
