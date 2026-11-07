@@ -1,0 +1,200 @@
+# =====================================================================
+# LOT Bot - Perfil de acceso autorizado a Wallapop
+# ---------------------------------------------------------------------
+# ESTE FICHERO ESTÁ INTENCIONADAMENTE VACÍO.
+#
+# LOT Bot no presupone CÓMO se accede a Wallapop ni QUÉ se puede hacer.
+# Las dos cosas las decide Wallapop y se declaran aquí.
+#
+# Son DOS piezas independientes, y hacen falta LAS DOS:
+#
+#   auth:              cómo se autentica cada cuenta
+#   api + operations:  qué operaciones existen y cómo se llaman
+#
+# Tener autorización verbal para automatizar NO sustituye a estos datos
+# técnicos: son los que le dicen al programa qué hacer exactamente.
+#
+# CÓMO USARLO
+#   1. Copia este fichero:  config/access_profile.example.yaml
+#                       ->  config/access_profile.local.yaml
+#      (`*.local.yaml` está en .gitignore y nunca se sube al repositorio)
+#   2. Rellena SOLO lo que Wallapop te haya autorizado.
+#   3. Apunta la variable de entorno al fichero:
+#      WALLAPOP_ACCESS_PROFILE=C:\ruta\a\access_profile.local.yaml
+#   4. Pon LOT_BOT_DEMO_MODE=false
+#
+# REGLA: lo que quede vacío NO existe para LOT Bot. La aplicación
+# responderá NOT_AVAILABLE_WITH_CURRENT_WALLAPOP_ACCESS en lugar de
+# simular la operación.
+#
+# NINGÚN SECRETO VA EN ESTE FICHERO. Los valores sensibles se leen de
+# variables de entorno; aquí solo se indica de qué variable.
+# =====================================================================
+
+meta:
+  # Documental: de quién procede la autorización y su referencia.
+  authorized_by: ""
+  authorization_ref: ""
+  notes: ""
+
+# ---------------------------------------------------------------------
+# 1. AUTENTICACIÓN — cómo demuestra cada cuenta quién es
+# ---------------------------------------------------------------------
+auth:
+  # Elige UNO de estos valores, el que Wallapop te haya autorizado:
+  #
+  #   oauth                 -> Wallapop ofrece un flujo OAuth 2.0
+  #   session_handoff       -> el usuario inicia sesión en Wallapop y el flujo
+  #                            autorizado devuelve una sesión a LOT Bot
+  #   delegated_credential  -> Wallapop emite una credencial por cuenta
+  #
+  # Vacío = sin declarar: LOT Bot se queda en modo DEMO y lo explica.
+  method: ""
+
+  # -- Opción A: OAuth 2.0 --------------------------------------------
+  # Solo si Wallapop te ha dado un flujo OAuth y un identificador de cliente.
+  oauth:
+    authorize_url: ""
+    token_url: ""
+    revoke_url: ""
+    use_pkce: true
+    scopes: []
+    # El secreto NO se escribe aquí: se indica de qué variable leerlo.
+  client_id_env: "WALLAPOP_CLIENT_ID"
+  client_secret_env: "WALLAPOP_CLIENT_SECRET"
+
+  # -- Opción B: inicio de sesión autorizado ---------------------------
+  # El usuario se autentica EN WALLAPOP (con MFA, CAPTCHA y lo que Wallapop
+  # exija) y el flujo autorizado devuelve la sesión a LOT Bot.
+  #
+  # LOT Bot NO lee el navegador del usuario, NO extrae cookies de su perfil,
+  # NO maneja su contraseña y NO automatiza el formulario de acceso.
+  session_handoff:
+    # Dirección exacta que Wallapop autoriza para iniciar el flujo.
+    login_url: ""
+    # Dirección local a la que el flujo devuelve la sesión.
+    # Wallapop debe tenerla registrada como destino válido.
+    return_uri: "http://127.0.0.1:8723/callback"
+    # Nombres de los campos que devuelve el flujo al volver.
+    session_fields: []
+    #   - session_token
+    #   - user_id
+    # Cómo se aplica la sesión a cada petición.
+    header_template: {}
+    #   Authorization: "Bearer {session_token}"
+    cookie_template: {}
+    #   sid: "{session_id}"
+    # Minutos de validez, si Wallapop los documenta.
+    expires_after_minutes:
+    # Operación barata para comprobar que la sesión sigue viva.
+    validation_operation: "account_profile"
+    # Texto que se muestra al usuario antes de abrir el navegador.
+    instructions: ""
+
+  # -- Opción C: credencial delegada por cuenta ------------------------
+  # NO es una API key de aplicación: es un valor que Wallapop emite para UNA
+  # cuenta concreta y que el titular introduce una sola vez.
+  # Deja el bloque comentado si no es tu caso.
+  # delegated_credential:
+  #   header_name: "Authorization"
+  #   header_format: "Bearer {credential}"
+  #   instructions: "Dónde obtiene el usuario esta credencial."
+  #   expires_after_minutes:
+  #   validation_operation: "account_profile"
+
+# ---------------------------------------------------------------------
+# 2. TRANSPORTE — qué se puede llamar
+# ---------------------------------------------------------------------
+# Aunque la autenticación esté resuelta, LOT Bot sigue necesitando saber
+# QUÉ operaciones existen. Este bloque no se puede deducir del anterior.
+api:
+  base_url: ""
+  timeout_seconds: 30
+  default_headers: {}
+    # Accept: "application/json"
+
+# ---------------------------------------------------------------------
+# 3. OPERACIONES AUTORIZADAS
+# ---------------------------------------------------------------------
+# Formato de cada operación:
+#
+#   nombre_operacion:
+#     method: GET | POST | PUT | PATCH | DELETE
+#     path: "/ruta/{item_id}"
+#     query:  { limit: "{limit}" }
+#     body:   { price: "{price}" }
+#     response:
+#       collection_path: "data"
+#       fields:
+#         item_id: "id"
+#         title: "title"
+#
+# Campos que LOT Bot espera en cada resultado:
+#   Item          -> item_id, title, description, price, currency, category,
+#                    condition, status, views, favorites, images
+#   Conversación  -> conversation_id, buyer_name, item_id, subject, unread,
+#                    last_message_at
+#   Mensaje       -> message_id, conversation_id, direction, body, sent_at
+#   Perfil        -> user_id, display_name, login, active_items
+#   Mercado       -> title, price, currency, category
+# ---------------------------------------------------------------------
+
+operations:
+  # ---- Cuenta ----
+  account_profile:
+
+  # ---- Anuncios: lectura ----
+  list_items:
+  get_item:
+  search_items:
+
+  # ---- Anuncios: escritura (requieren confirmación del usuario) ----
+  create_item:
+  update_item:
+  update_item_price:
+  update_item_images:
+  delete_item:
+  upload_image:
+
+  # ---- Categorías ----
+  list_categories:
+
+  # ---- Mensajería ----
+  list_conversations:
+  get_conversation:
+  send_message:
+
+  # ---- Datos de mercado ----
+  market_data:
+
+# =====================================================================
+# EJEMPLO ILUSTRATIVO DEL FORMATO
+# (NO son datos de Wallapop: es solo la estructura)
+# ---------------------------------------------------------------------
+# auth:
+#   method: "session_handoff"
+#   session_handoff:
+#     login_url: "<la que indique Wallapop>"
+#     return_uri: "http://127.0.0.1:8723/callback"
+#     session_fields: ["session_token", "user_id"]
+#     header_template:
+#       Authorization: "Bearer {session_token}"
+#     expires_after_minutes: 720
+#
+# api:
+#   base_url: "<la que indique Wallapop>"
+#
+# operations:
+#   list_items:
+#     method: GET
+#     path: "/v1/items"
+#     query:
+#       limit: "{limit}"
+#       offset: "{offset}"
+#     response:
+#       collection_path: "data"
+#       fields:
+#         item_id: "id"
+#         title: "attributes.title"
+#         price: "attributes.price.amount"
+# =====================================================================

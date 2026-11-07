@@ -1,0 +1,78 @@
+# ---- Secretos y datos del cliente (NUNCA subir) ----
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+data/
+user_data/
+*.db
+*.sqlite
+*.sqlite3
+lot_bot_data/
+endpoint_map.local.yaml
+access_profile.local.yaml
+*.local.yaml
+
+# ---- Sesiones de navegador, cookies y claves (NUNCA subir) ----
+# Los perfiles viven en la carpeta de datos del usuario, fuera del proyecto;
+# estas reglas son una segunda barrera por si alguien los copia aquí.
+browser_profiles/
+**/browser_profiles/
+storage_state*.json
+*.har
+Cookies
+Cookies-journal
+Login Data
+Login Data-journal
+Local State
+playwright-report/
+test-results/
+claves_api*
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+.venv-build/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+develop-eggs/
+
+# ---- Build / empaquetado ----
+build/work/
+dist/
+*.spec.bak
+installer_output/
+
+# ---- Tests / tooling ----
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# ---- Estado local de LOT Bot (si se usa LOT_BOT_DATA_DIR dentro del proyecto) ----
+demo_state.json
+master.key
+
+# ---- Logs ----
+# Solo la carpeta logs/ de la raiz; NO el paquete lot_bot/logs/ (codigo fuente).
+/logs/
+*.log
+
+# ---- Sistema operativo / IDE ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lot-bot"
+version = "1.0.0"
+description = "LOT Bot - gestion y automatizacion multicuenta de Wallapop con asistente IA"
+requires-python = ">=3.11"
+readme = "README.md"
+license = { file = "LICENSE" }
+
+[tool.setuptools.packages.find]
+include = ["lot_bot*"]
+
+[tool.setuptools.package-data]
+lot_bot = ["resources/*", "resources/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "ui: pruebas que requieren Qt (se omiten sin entorno grafico)",
+    "e2e: pruebas de extremo a extremo en modo DEMO",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = [
+    "E501",
+    # Los enums heredan de (str, Enum) a proposito: asi se serializan solos a
+    # JSON en las herramientas de la IA y encajan con sqlalchemy.Enum.
+    "UP042",
+]

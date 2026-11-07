@@ -1,0 +1,389 @@
+# =============================================================================
+#  LOT Bot — Integración con Wallapop mediante navegador
+#  UNICO sitio donde se describe la interfaz web de Wallapop.
+# =============================================================================
+#
+#  IMPORTANTE — LEE ESTO ANTES DE USARLO
+#  -------------------------------------
+#  * Esto NO es una API. Son las páginas públicas de es.wallapop.com, que el
+#    propio usuario usa con su sesión, desde un navegador visible.
+#  * Los selectores se han escrito a partir de los textos visibles de la web
+#    (botones, etiquetas) y NO se han podido comprobar contra una sesión real
+#    al escribirlos. Por eso figura «verificado: false».
+#  * Cuando Wallapop cambie su web, se corrige AQUÍ, sin tocar el código:
+#    copia este fichero a  <carpeta de datos>/config/wallapop_browser.local.yaml
+#    (Configuración → Wallapop muestra la ruta exacta) y edita esa copia.
+#  * Cada objetivo admite varias alternativas: se usa la primera visible.
+#    Sintaxis de Playwright: CSS, «text=...», «role=button[name=/.../i]».
+#  * Nunca se intenta resolver CAPTCHA ni verificaciones: si aparecen, la
+#    cola se pausa y el usuario las completa a mano en la ventana.
+# =============================================================================
+
+verificado: false
+
+navegador:
+  # Siempre visible: el usuario ve lo que ocurre y puede intervenir.
+  visible: true
+  # Orden de preferencia. En Windows se buscan primero Chrome y Edge
+  # instalados (rutas habituales); «chromium» usa el que instala Playwright.
+  # Siempre con perfil propio y persistente por cuenta, ventana normal (ni
+  # invitado ni incógnito) y con el sandbox de seguridad activado.
+  canales: ["chrome", "msedge", "chromium"]
+  idioma: "es-ES"
+  tiempo_espera_ms: 20000
+
+urls:
+  inicio: "https://es.wallapop.com/"
+  subir: "https://es.wallapop.com/app/catalog/upload"
+  # Patrón de la dirección pública de un anuncio.
+  anuncio_regex: "https://es\\.wallapop\\.com/item/[A-Za-z0-9\\-_%]+"
+  # Lista de TUS productos en venta (de aquí se sacan las direcciones de los
+  # anuncios para sincronizar, eliminar y cambiar precio o título).
+  # SIN VERIFICAR contra la web real: si no es esta, cámbiala aquí.
+  mis_anuncios: "https://es.wallapop.com/app/catalog/published"
+
+sesion:
+  # Elementos que SOLO aparecen con la sesión iniciada. Son una señal más,
+  # nunca la única: la comprobación real está en «comprobacion».
+  iniciada:
+    - "a[href*='/app/profile']"
+    - "role=link[name=/Tu perfil|Perfil/i]"
+    - "role=button[name=/Tu perfil|Perfil/i]"
+  # Visible solo SIN sesión (botón de acceso o ventana de inicio de sesión).
+  sin_sesion:
+    - "role=button[name=/Regístrate o inicia sesión/i]"
+    - "text=/Regístrate o inicia sesión/i"
+    - "role=button[name=/^Iniciar sesión$/i]"
+    - "role=dialog[name=/inicia sesión|regístrate/i]"
+  # Cualquier verificación que debe completar el usuario.
+  verificacion:
+    - "iframe[src*='captcha']"
+    - "iframe[title*='captcha' i]"
+    - "iframe[src*='challenge']"
+    - "text=/verifica que eres/i"
+    - "text=/no soy un robot/i"
+  # Opcional: nombre visible del usuario (se muestra al confirmar la cuenta).
+  nombre_usuario: []
+  # COMPROBACIÓN REAL DE LA SESIÓN. Una cuenta solo se marca como conectada
+  # si se cumplen TODAS estas condiciones:
+  #   1. se abre una página privada (solo accesible con sesión) y Wallapop
+  #      NO redirige fuera de ella;
+  #   2. no aparece ningún elemento de «sin_sesion» (botón de acceso);
+  #   3. no aparece ninguna verificación;
+  #   4. aparece al menos un elemento de «iniciada» o del formulario privado.
+  comprobacion:
+    url: subir
+    url_debe_contener: "/app/"
+    espera_ms: 1500
+    # Elementos que prueban que se ve la página privada.
+    privada:
+      - "input[name='summary']"
+      - "role=textbox[name=/Resumen del producto|Título/i]"
+      - "text=/Algo que ya no necesito/i"
+      - "a[href*='/app/profile']"
+  # Mantener abierto el navegador de cada cuenta entre publicaciones y
+  # cerrarlo tras este tiempo sin uso (segundos).
+  mantener_abierto_s: 900
+
+# Estadísticas. SOLO se guardan datos que aparezcan de verdad en la página
+# del anuncio; si un patrón no encuentra nada, el dato queda «No disponible».
+# Sin verificar contra la web real.
+estadisticas:
+  visualizaciones: "(\\d[\\d.]*)\\s*(?:visualizaciones|visitas|vistas)"
+  favoritos: "(\\d[\\d.]*)\\s*(?:favoritos|me gusta)"
+
+# -----------------------------------------------------------------------------
+# ELIMINAR un anuncio publicado por LOT Bot. Se abre su página (la dirección
+# guardada al publicarlo), se pulsa eliminar, se elige un motivo si Wallapop lo
+# pide, se confirma y se COMPRUEBA que ya no está. SIN VERIFICAR contra la web
+# real: se buscan los botones por su texto. Si algo no coincide, el bot se para
+# y deja captura en logs/navegador para ajustar esta sección.
+# -----------------------------------------------------------------------------
+eliminar:
+  # Menú «…» que hay que abrir antes (si el botón está dentro).
+  menu:
+    - "role=button[name=/^(Más opciones|Opciones|Más acciones)$/i]"
+  boton:
+    - "role=button[name=/^(Eliminar|Borrar)( (producto|anuncio))?$/i]"
+    - "role=menuitem[name=/^(Eliminar|Borrar)( (producto|anuncio))?$/i]"
+    - "text=/^\\s*(Eliminar|Borrar)( (producto|anuncio))?\\s*$/i"
+  # Si pregunta el motivo, se elige el primero que aparezca.
+  motivos:
+    - "text=/^\\s*Ya no lo vendo\\s*$/i"
+    - "text=/^\\s*Otro motivo\\s*$/i"
+    - "text=/^\\s*Otros?\\s*$/i"
+  confirmar:
+    - "[role=dialog] >> role=button[name=/^(Sí, eliminar|Eliminar|Borrar|Confirmar|Aceptar|Continuar)$/i]"
+    - "role=button[name=/^(Sí, eliminar|Confirmar eliminación)$/i]"
+  # Textos que indican que el anuncio ya no existe / se ha eliminado.
+  eliminado:
+    - "text=/(se ha eliminado|has eliminado|anuncio eliminado|producto eliminado)/i"
+    - "text=/(no existe|ya no está disponible|no se ha encontrado|no encontrado)/i"
+  espera_ms: 15000
+
+# -----------------------------------------------------------------------------
+# EDITAR (cambiar precio o título). Se abre el anuncio, se pulsa «Editar», se
+# cambia el campo (los mismos del formulario de publicar: «precio» y
+# «titulo_revision»/«titulo»), se guarda y se COMPRUEBA en la página del
+# anuncio. SIN VERIFICAR contra la web real.
+# -----------------------------------------------------------------------------
+editar:
+  menu:
+    - "role=button[name=/^(Más opciones|Opciones|Más acciones)$/i]"
+  boton:
+    - "role=button[name=/^Editar( producto| anuncio)?$/i]"
+    - "role=link[name=/^Editar( producto| anuncio)?$/i]"
+    - "role=menuitem[name=/^Editar( producto| anuncio)?$/i]"
+    - "text=/^\\s*Editar( producto| anuncio)?\\s*$/i"
+  guardar:
+    - "role=button[name=/^(Guardar cambios|Guardar|Actualizar( producto)?|Actualizar anuncio)$/i]"
+    - "role=button[name=/^(Subir producto|Publicar)$/i]"
+  espera_ms: 20000
+
+# -----------------------------------------------------------------------------
+# PUBLICAR. LOT Bot hace TODO el formulario con estos métodos, en este orden:
+#   open_create_listing → tipo de anuncio → fill_title → select_category →
+#   fill_attributes → fill_description → fill_price → upload_photos →
+#   comprobar el formulario → submit_listing → wait_for_publish_confirmation →
+#   get_published_listing_url
+# Cada campo: «objetivos» (dónde escribir/pulsar; se usa el primero visible) y,
+# opcionalmente, «lectura» (dónde leer lo que ha quedado, para COMPROBAR antes
+# de publicar; si no se indica, se lee en el mismo objetivo).
+# «opcional: true» → si el campo no existe en el formulario se omite y se
+# avisa; si existe y no se puede rellenar, NO se publica.
+# SIN VERIFICAR contra la web real (ver «verificado» arriba).
+# -----------------------------------------------------------------------------
+publicar:
+  formato_precio: "coma"   # «coma» → 11,44   ·   «punto» → 11.44
+  formulario:
+    abrir:
+      url: subir
+    tipo_anuncio:
+      opcional: true
+      objetivos:
+        - "role=button[name=/Algo que ya no necesito/i]"
+        - "text=/Algo que ya no necesito/i"
+    titulo:
+      objetivos:
+        - "input[name='summary']"
+        - "#summary"
+        - "role=textbox[name=/Resumen del producto|Título/i]"
+    # «Continuar» del formulario por pasos de Wallapop (tras el título, etc.).
+    # Solo dentro del formulario: NUNCA el menú «Categorías» de la cabecera,
+    # que sirve para BUSCAR productos, no para elegir la categoría del tuyo.
+    # Solo botones ACTIVOS: el «Continuar» de una sección ya hecha (o el de
+    # Fotos antes de subir una foto) está desactivado y nunca se pulsa.
+    continuar:
+      objetivos:
+        - "button:enabled:text-is('Continuar')"
+        - "role=button[name=/^Continuar$/i][disabled=false]"
+    categoria:
+      objetivos:
+        - "form >> role=combobox[name=/^Categoría(?!s)/i]"
+        - "main >> role=combobox[name=/^Categoría(?!s)/i]"
+        - "form >> role=button[name=/^Categoría(?!s)/i]"
+        - "main >> role=button[name=/^Categoría(?!s)/i]"
+        - "role=combobox[name=/^Categoría(?!s)/i]"
+        - "role=button[name=/^Categoría(?!s)/i]"
+        - "[placeholder^='Categoría' i]"
+        - "text=/^Categoría y subcategoría$/i"
+      # Panel con la lista de categorías, una vez abierto. Mientras se vea, la
+      # categoría NO está elegida. En Wallapop tiene los títulos «Categorías
+      # sugeridas» y «Todas las categorías».
+      panel:
+        - "role=listbox"
+        - "role=tree"
+        - "div:has(:text-is('Categorías sugeridas')):has(:text-is('Todas las categorías'))"
+      # Ruta completa de las categorías conocidas, por si la plantilla solo
+      # dice el nombre final y Wallapop no la muestra entre las sugeridas.
+      rutas:
+        # Ruta real vista en Wallapop (el campo muestra «Hogar y jardín >
+        # Muebles y organización > Camas y accesorios» tras elegir).
+        "Estructura de camas": "Hogar y jardín > Muebles y organización > Camas y accesorios > Estructura de camas"
+        "Colchones": "Hogar y jardín > Muebles y organización > Camas y accesorios > Colchones"
+      # Dónde se ve la categoría elegida (opcional; si no, el propio campo).
+      seleccionada:
+        - "role=combobox[name=/^Categoría(?!s)/i]"
+        - "role=button[name=/^Categoría(?!s)/i]"
+    subcategoria:
+      opcional: true
+      objetivos:
+        - "form >> role=combobox[name=/^Subcategoría/i]"
+        - "main >> role=combobox[name=/^Subcategoría/i]"
+        - "main >> role=button[name=/^Subcategoría/i]"
+        - "role=combobox[name=/^Subcategoría/i]"
+    caracteristicas:
+      estado:
+        opcional: true
+        objetivos:
+          - "main >> role=combobox[name=/^(Estado)/i]"
+          - "main >> role=button[name=/^(Estado)/i]"
+          - "role=combobox[name=/^(Estado)/i]"
+          - "role=button[name=/^(Estado)/i]"
+      uso:
+        opcional: true
+        objetivos:
+          - "main >> role=combobox[name=/^(Uso|Estancia|Habitación)/i]"
+          - "main >> role=button[name=/^(Uso|Estancia|Habitación)/i]"
+          - "role=combobox[name=/^(Uso|Estancia|Habitación)/i]"
+          - "role=button[name=/^(Uso|Estancia|Habitación)/i]"
+      color:
+        opcional: true
+        objetivos:
+          - "main >> role=combobox[name=/^(Color)/i]"
+          - "main >> role=button[name=/^(Color)/i]"
+          - "role=combobox[name=/^(Color)/i]"
+          - "role=button[name=/^(Color)/i]"
+      material:
+        opcional: true
+        objetivos:
+          - "main >> role=combobox[name=/^(Material)/i]"
+          - "main >> role=button[name=/^(Material)/i]"
+          - "role=combobox[name=/^(Material)/i]"
+          - "role=button[name=/^(Material)/i]"
+      # Marca del Anuncio principal (vacía = no se toca). Puede ser un campo para
+      # escribir (con sugerencias) o un desplegable. Solo el campo llamado
+      # EXACTAMENTE «Marca»: nunca «Marca la localización» (la ubicación).
+      marca:
+        opcional: true
+        objetivos:
+          - "main >> role=combobox[name=/^Marca(\\s*\\*|\\s*\\(opcional\\))?$/i]"
+          - "main >> role=textbox[name=/^Marca(\\s*\\*|\\s*\\(opcional\\))?$/i]"
+          - "main >> role=button[name=/^Marca(\\s*\\*|\\s*\\(opcional\\))?$/i]"
+          - "role=combobox[name=/^Marca(\\s*\\*|\\s*\\(opcional\\))?$/i]"
+          - "role=textbox[name=/^Marca(\\s*\\*|\\s*\\(opcional\\))?$/i]"
+          - "input[name='brand']"
+    # Pantalla «Revisa la información»: Wallapop rellena el título con su IA
+    # («Canapé de madera con almacenaje»); se vuelve a poner el de la plantilla.
+    titulo_revision:
+      objetivos:
+        - "role=textbox[name=/^Título/i]"
+        - "input[name='title']"
+    # Interruptor «Activar envío»: se deja SIEMPRE apagado (sin envíos). Si
+    # Wallapop lo trae activado, el bot lo desactiva.
+    envio:
+      activado: false
+      objetivos:
+        - "role=switch[name=/Activar envío/i]"
+        - "role=checkbox[name=/Activar envío/i]"
+        - "label:has-text('Activar envío') input[type='checkbox']"
+        # Interruptor dibujado sobre una casilla oculta: la casilla siguiente
+        # al texto «Activar envío» (se marca/desmarca aunque esté oculta).
+        - "xpath=//*[normalize-space(text())='Activar envío']/following::*[@role='switch' or @role='checkbox' or self::input[@type='checkbox']][1]"
+        # El interruptor junto al texto «Activar envío» (misma fila).
+        - "xpath=//*[normalize-space(text())='Activar envío']/ancestor::*[.//*[@role='switch' or @role='checkbox' or self::input[@type='checkbox']]][1]//*[@role='switch' or @role='checkbox' or self::input[@type='checkbox']]"
+    # Ubicación del anuncio (Anuncio principal → «Ubicación»). Wallapop pone la
+    # de la cuenta; si la plantilla indica otra ciudad, se cambia: se abre el
+    # campo, se escribe la ciudad y se elige la primera sugerencia que la
+    # contenga. SIN VERIFICAR contra la web real.
+    ubicacion:
+      opcional: true
+      # «Tus productos se verán en: Marca la localización». Puede ser un campo
+      # de texto o una CAJA que abre el buscador de direcciones. Nunca el
+      # buscador de productos de la cabecera (por eso «:not(header *)» y
+      # siempre dentro de la sección «Tus productos se verán en»).
+      objetivos:
+        - "input[placeholder*='Marca la localización' i]:not(header *)"
+        - "text=/^\\s*Marca la localización\\s*$/i"
+        - "xpath=//*[text()[contains(., 'Tus productos se verán en')]][not(ancestor::header)]/following::*[self::input or @role='button' or self::button][1]"
+        - "input[placeholder*='localización' i]:not(header *)"
+      # Campo donde se escribe la ciudad (el mismo, o el que se abre al pulsar
+      # la caja). NO se toca el mapa: se escribe la ciudad y se elige la
+      # sugerencia.
+      escribir:
+        - "[role=dialog] input:not([type=hidden]):not([type=checkbox]):not([type=radio])"
+        - "input[placeholder*='localización' i]:not(header *)"
+        - "input[placeholder*='dirección' i]:not(header *)"
+        - "input[placeholder*='ubicación' i]:not(header *)"
+        - "input[placeholder*='ciudad' i]:not(header *)"
+        - "input[placeholder*='código postal' i]:not(header *)"
+      # Botón para confirmar la ubicación elegida (si lo hay).
+      confirmar:
+        - "role=button[name=/^(Aplicar|Guardar|Confirmar|Aceptar|Listo)$/i]"
+    # Cerrar una lista desplegable sin deshacer lo elegido: su botón de
+    # aceptar (si lo tiene) o un clic en un título del formulario.
+    listas_aceptar:
+      - "role=button[name=/^(Aplicar|Aceptar|Hecho|Listo|Confirmar)$/i]"
+      # Color y Material (varias opciones): el botón verde «Seleccionar» del
+      # final de la lista. Sin pulsarlo, Wallapop olvida lo marcado.
+      - "role=button[name=/^\\s*Seleccionar\\s*$/i]"
+      - "text=/^\\s*Seleccionar\\s*$/i"
+    # Lista de varias opciones (Color, Material): texto del botón de su
+    # cabecera que quita todo lo marcado. Se pulsa ANTES de marcar, así marcar
+    # nunca puede desmarcar algo que ya estaba (Wallapop o su IA lo marcan).
+    listas_borrar:
+      - "Borrar"
+    # Botón que GUARDA lo marcado en esa misma lista (se busca el que cuelga
+    # del campo que se está rellenando, no el de otra lista).
+    listas_guardar:
+      - "Seleccionar"
+    clic_fuera:
+      - "text=/^Información del producto$/"
+      - "text=/^Revisa la información$/"
+    # Si Wallapop no tiene el valor exacto de la plantilla, se prueban estas
+    # alternativas en orden (se indica en el resultado cuál se eligió).
+    equivalencias:
+      color:
+        "Gris y Blanco": ["Gris", "Blanco"]
+    descripcion:
+      objetivos:
+        - "textarea[name='description']"
+        - "#description"
+        - "role=textbox[name=/Descripción/i]"
+    precio:
+      objetivos:
+        - "input[name='sale_price']"
+        - "#sale_price"
+        - "role=spinbutton[name=/Precio/i]"
+        - "role=textbox[name=/Precio/i]"
+    fotos:
+      # Campo de archivos. Suele estar OCULTO (no se ve, pero existe en la
+      # página): se usa igualmente. Primero el que acepta imágenes y está
+      # dentro del formulario (no el de «buscar por foto» de la cabecera).
+      objetivos:
+        - "main input[type='file'][accept*='image']"
+        - "form input[type='file'][accept*='image']"
+        - "main input[type='file']"
+        - "form input[type='file']"
+        - "input[type='file'][accept*='image']:not(header *):not(nav *)"
+        - "input[type='file']:not(header *):not(nav *)"
+      # Si el campo no existe hasta pulsar un botón, se pulsa este botón y se
+      # entrega la foto en la ventana de «Abrir archivo» (sin que se vea).
+      boton:
+        - "role=button[name=/^Subir fotos$/i]"
+        - "text=/^Subir fotos$/i"
+        - "main >> role=button[name=/(sube|subir|añade|añadir|elige).*(foto|imagen)/i]"
+        - "main >> text=/(sube|subir|añade|añadir|elige).*(foto|imagen)/i"
+        - "main >> role=button[name=/^(foto|fotos|imágenes)$/i]"
+        - "role=button[name=/^(sube|subir|añade|añadir|elige).{0,12}(fotos?|imágenes?)$/i]"
+      # Miniaturas que aparecen cuando Wallapop HA CARGADO cada foto.
+      miniaturas:
+        - "[data-testid*='image-preview']"
+        - "[class*='ImagePreview'] img"
+        - "[class*='image-preview'] img"
+        - "main img[src^='blob:']"
+        - "main img[src^='data:image']"
+        - "img[src^='blob:']:not(header *)"
+        - "img[src^='data:image']:not(header *)"
+        - "[class*='thumbnail' i] img"
+        - "[class*='preview' i] img"
+      # Mensajes de foto rechazada.
+      rechazada:
+        - "text=/imagen no válida|formato no (?:válido|soportado)|no se ha podido subir la (?:foto|imagen)/i"
+      espera_ms: 30000
+    publicar:
+      objetivos:
+        - "role=button[name=/^Subir producto$/i]"
+        - "main >> role=button[name=/^Publicar/i]"
+        - "main >> button[type='submit']"
+        - "role=button[name=/^(Subir producto|Publicar)/i][disabled=false]"
+    # Mensajes de error de Wallapop durante la publicación.
+    errores:
+      - "text=/ha ocurrido un error|algo ha ido mal|no se ha podido publicar/i"
+  # Cómo se sabe que ha terminado bien. Sin esto NO se da por publicado:
+  # el resultado queda como «Resultado no confirmado».
+  exito:
+    url_regex: "/item/|/app/catalog/published"
+    textos:
+      - "text=/ya está a la venta|producto subido|anuncio publicado/i"
+    tiempo_espera_ms: 60000

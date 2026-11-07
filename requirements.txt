@@ -1,0 +1,39 @@
+# --- Interfaz grafica ---
+PySide6-Essentials==6.8.1
+
+# --- Datos ---
+SQLAlchemy>=2.0.30,<3.0
+alembic>=1.13,<2.0
+
+# --- Configuracion ---
+pydantic>=2.7,<3.0
+pydantic-settings>=2.3,<3.0
+python-dotenv>=1.0,<2.0
+PyYAML>=6.0,<7.0
+
+# --- Seguridad ---
+cryptography>=42.0
+keyring>=25.0
+
+# --- Red ---
+httpx>=0.27,<1.0
+
+# --- Automatizaciones ---
+APScheduler>=3.10,<4.0
+
+# --- Imagenes ---
+Pillow>=10.3
+
+# --- Plantillas ---
+Jinja2>=3.1
+
+# --- IA ---
+anthropic>=0.40
+
+# --- Integración con Wallapop mediante navegador ---
+# Usa el Chrome o Edge ya instalado. Para el navegador propio de Playwright:
+#   python -m playwright install chromium
+playwright>=1.45,<2.0
+
+# --- Utilidades ---
+rapidfuzz>=3.9

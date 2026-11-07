@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Subir producto (SIMULADO)</title>
+<style>
+body{font-family:sans-serif;max-width:720px;margin:24px auto;padding:0 12px}
+label{display:block;margin-top:14px;font-weight:bold}
+input,textarea{width:100%;padding:6px;font-size:14px}
+.combo{position:relative}
+.combo ul{list-style:none;padding:0;margin:0;border:1px solid #999;background:#fff;position:absolute;z-index:5;width:100%}
+.combo ul li{padding:14px 6px}
+.combo li{padding:6px;cursor:pointer}
+.previews{display:flex;gap:8px;margin-top:8px}
+.previews img{width:90px;height:68px;object-fit:cover}
+#captcha{border:2px solid #c00;padding:12px;margin:12px 0}
+.banner{background:#fe0;padding:8px}
+</style></head>
+<body>
+<p class="banner">PÁGINA DE PRUEBA LOCAL que imita el formulario de Wallapop. No es Wallapop.</p>
+<header><a href="/app/profile">Tu perfil</a>
+  <!-- Trampa: el menú de la cabecera sirve para BUSCAR, no para elegir la categoría. -->
+  <button type="button" onclick="location.href='/buscar-categorias'">Categorías</button>
+  <!-- Trampa: «buscar por foto» de la cabecera; NO es el campo del anuncio. -->
+  <input type="file" id="buscar-foto" accept="image/*" style="display:none"
+         onchange="location.href='/buscar-por-foto'">
+  <!-- Trampa: el buscador de productos de la cabecera. La ciudad NUNCA va aquí. -->
+  <input type="search" id="buscador" role="combobox" aria-label="Buscar en Wallapop" placeholder="Buscar en Wallapop">
+</header>
+<div id='contenido'>
+<div id="captcha" hidden><iframe title="captcha simulado" src="about:blank" width="200" height="40"></iframe>
+  <p>Verifica que eres humano (simulado)</p>
+  <button type="button" onclick="document.getElementById('captcha').hidden=true">He completado la verificación</button></div>
+<button type="button" id="tipo">Algo que ya no necesito</button>
+<form id="f" onsubmit="return false">
+  <label for="summary">Resumen del producto</label>
+  <input id="summary" name="summary">
+  <p><button type="button" id="continuar" onclick="document.getElementById('seccion-fotos').hidden=false;this.disabled=true">Continuar</button></p>
+  <section id="seccion-fotos" hidden>
+    <h3>Fotos</h3>
+    <button type="button" id="subir-fotos">Subir fotos</button> Arrastra tus fotos aquí
+    <input type="file" id="fotos" accept="image/jpeg,image/png,image/webp" multiple style="display:none">
+    <button type="button" id="boton-fotos" hidden>Sube tus fotos</button>
+    <div class="previews" id="previews"></div>
+    <p><button type="button" id="continuar-fotos" disabled onclick="document.getElementById('paso2').hidden=false;this.disabled=true">Continuar</button></p>
+  </section>
+  <div id="paso2" hidden>
+  <p>No te preocupes, te ayudaremos con algunas sugerencias cuando abras el desplegable</p>
+  <div class="combo" style="margin-top:220px"><button type="button" role="combobox" aria-label="Categoría y subcategoría" id="cat">Categoría y subcategoría</button></div>
+  <p id="preparando" hidden>Preparando el resto de la información…</p>
+  <div id="revision" hidden>
+  <h3>Información del producto</h3>
+  <p><b>Revisa la información</b> Hemos rellenado algunos detalles por ti.</p>
+  <label>Marca</label>
+  <div class="combo" id="marca-combo"><button type="button" role="combobox" aria-label="Marca" data-options="IKEA|Pikolin|Flex|Pikolin Home">Marca</button></div>
+  <label>Color*</label>
+  <div class="combo"><button type="button" role="combobox" aria-label="Color*" data-multi="1" data-options="Marrón|Beige|Gris|Blanco|Negro">Color*</button></div>
+  <label>Material*</label>
+  <div class="combo"><button type="button" role="combobox" aria-label="Material*" data-multi="1" data-options="Madera|Metal">Material*</button></div>
+  <label for="title">Título*</label>
+  <input id="title" name="title" value="Canapé de madera con almacenaje">
+  <label for="description">Descripción*</label>
+  <textarea id="description" name="description" rows="5">Canapé de madera con almacenaje.
+- Estructura robusta.
+- Diseño moderno y funcional.</textarea>
+  <label>Estado*</label>
+  <div class="combo"><button type="button" role="combobox" aria-label="Estado*" data-prerender="1" data-options="Nuevo|Como nuevo|En buen estado">Estado*</button></div>
+  <div id="sugerencias"><b>Sugerencias inteligentes</b>
+    <span class="chip">Marrón</span> <span class="chip">Madera</span> <span class="chip">Nuevo</span></div>
+  <label for="sale_price">Precio*</label>
+  <input id="sale_price" name="sale_price" type="number" step="0.01">
+  <h3>Opciones de envío</h3>
+  <div class="fila"><span>Activar envío</span>
+    <label class="interruptor"><input type="checkbox" id="envio" checked style="display:none">
+      <span class="dibujo" style="display:inline-block;width:40px;height:20px;background:#333"></span></label></div>
+  <div id="pesos"><b>¿Cuánto pesa?</b> <label><input type="radio" name="peso"> 2 a 5 kg</label></div>
+  <label>Ubicación</label>
+  <p>Tus productos se verán en:</p>
+  <input id="ubic-busca" placeholder="Marca la localización">
+  <div id="ubic-sug"></div>
+  <span id="ubic" hidden></span>
+  <div id="mapa" style="height:60px;background:#dde" title="mapa (no se toca)"></div>
+  </div>
+  <div style="height:300px"></div>
+  <div style="position:fixed;left:0;right:0;bottom:0;height:140px;background:#fff;border-top:1px solid #ccc;z-index:50">
+    <button type="button">¿Qué aspecto tiene?</button>
+    <button type="button" id="subir">Publicar</button></div>
+  </div>
+</form>
+<footer><p>Búsquedas populares: <a href='/buscar-categorias'>Estructura de camas</a></p>
+<span style='display:none'>Estructura de camas</span></footer>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+if (params.get('captcha') === '1' || localStorage.getItem('captcha') === '1') {
+  document.getElementById('captcha').hidden = false; localStorage.removeItem('captcha');
+}
+// Modos (?cat=...): arbol (sin sugeridas: hay que recorrer niveles),
+// lento (las opciones tardan), ignora (los clics no seleccionan nada).
+const CAT_MODE_RAW = params.get('cat') || '';
+const CAT_MODE = ['dentro', 'lento', 'ignora'].find(m => CAT_MODE_RAW.split('-').includes(m)) || CAT_MODE_RAW;
+const CAT_TREE_ONLY = CAT_MODE_RAW.split('-').includes('arbol');
+const TREE = {'Motos': null, 'Hogar y jardín': {'Muebles y organización': {'Sofás': null,
+  'Camas y accesorios': {'Colchones': null, 'Estructura de camas': null}}}};
+function renderCats(ul, btn, level) {
+  let node = TREE; level.forEach(p => node = node[p]);
+  let html = '';
+  if (!level.length && !CAT_TREE_ONLY) {
+    html += '<div><b>Categorías sugeridas</b></div>' +
+      '<div class="opt"><div><span>Colchones</span></div><small>Camas y accesorios &gt; Muebles y organización</small></div>' +
+      '<div class="opt"><div><span>Estructura de camas</span></div><small>Camas y accesorios &gt; Muebles y organización</small></div>';
+  }
+  html += '<div><b>' + (level.length ? level[level.length - 1] : 'Todas las categorías') + '</b></div>';
+  Object.keys(node).forEach(k => {
+    html += '<div class="opt"><span>' + k + '</span>' + (node[k] ? ' ›' : '') + '</div>';
+  });
+  ul.innerHTML = html;
+  ul.querySelectorAll('.opt').forEach(li => li.addEventListener('click', ev => {
+    ev.stopPropagation();
+    if (CAT_MODE === 'ignora') return;
+    const name = li.querySelector('span').textContent;
+    if (node[name]) { renderCats(ul, btn, [...level, name]); return; }
+    // Como el Wallapop real: el campo muestra la RUTA de la categoría madre,
+    // no el nombre elegido.
+    btn.textContent = 'Hogar y jardín > Muebles y organización > Camas y accesorios';
+    btn.dataset.elegida = name;
+    if (CAT_MODE_RAW.includes('oculta')) ul.style.display = 'none'; else ul.remove();
+    btn.parentElement.removeAttribute('aria-expanded');
+    // Como Wallapop: «preparando» el resto del formulario unos segundos, se
+    // vuelve a dibujar el campo y, al final, su IA reescribe la descripción.
+    const prep = document.getElementById('preparando'); prep.hidden = false;
+    setTimeout(() => {
+      prep.hidden = true;
+      const nuevo = btn.cloneNode(true); btn.replaceWith(nuevo);
+      document.getElementById('revision').hidden = false;
+      setTimeout(() => { document.getElementById('description').value =
+        'Canapé de madera con almacenaje. Generado por la IA de Wallapop.'; }, 1500);
+    }, CAT_MODE_RAW.includes('rapido') ? 0 : 3000);
+  }));
+}
+if (CAT_MODE === 'dentro') {
+  // Variante: el elemento con role=combobox es el CONTENEDOR y la lista se
+  // abre DENTRO de él (el texto elegido se muestra en un <span> interno).
+  const b = document.getElementById('cat');
+  b.removeAttribute('role'); b.removeAttribute('aria-label');
+  b.parentElement.setAttribute('role', 'combobox');
+  b.parentElement.setAttribute('aria-label', 'Categoría y subcategoría');
+}
+const catTrigger = CAT_MODE === 'dentro' ? document.getElementById('cat').parentElement
+                                         : document.getElementById('cat');
+catTrigger.addEventListener('click', () => {
+  const btn = document.getElementById('cat');
+  const vieja = btn.parentElement.querySelector('.lista');
+  if (vieja && vieja.style.display !== 'none') return;
+  if (vieja) vieja.remove();
+  // Como Wallapop: la lista está DENTRO del componente del desplegable
+  // (aria-expanded) y las opciones son <div> sin rol, con una segunda línea.
+  btn.parentElement.setAttribute('aria-expanded', 'true');
+  const ul = document.createElement('div'); ul.className = 'lista';
+  ul.style.cssText = CAT_MODE === 'dentro' ? 'background:#fff;border:1px solid #999'
+    : 'position:absolute;bottom:40px;background:#fff;border:1px solid #999;width:100%';
+  btn.parentElement.appendChild(ul);
+  if (CAT_MODE === 'lento') setTimeout(() => renderCats(ul, btn, []), 900);
+  else renderCats(ul, btn, []);
+});
+// Como Wallapop: el Estado tiene sus opciones YA en la página (ocultas) antes
+// de abrir la lista; al pulsar solo se muestran.
+document.querySelectorAll('[data-prerender]').forEach(btn => {
+  // Lista como un bloque ENFOCABLE (tabindex) con opciones <div> sin rol, y
+  // el campo abre/cierra la lista con cada clic (como un desplegable real).
+  const ul = document.createElement('div'); ul.className = 'pre'; ul.tabIndex = -1;
+  ul.style.cssText = 'display:none;position:absolute;z-index:5;background:#fff;border:1px solid #999;width:100%;height:220px';
+  btn.dataset.options.split('|').forEach(o => {
+    const li = document.createElement('div'); li.className = 'opcion';
+    li.style.cssText = 'padding:14px 6px'; li.innerHTML = '<span>' + o + '</span>';
+    li.addEventListener('click', ev => {
+      ev.stopPropagation();
+      // El PRIMER clic no registra la opción (como en tu log).
+      if (!btn.dataset.fallado) { btn.dataset.fallado = '1'; ul.style.display = 'none'; return; }
+      btn.textContent = o; ul.style.display = 'none';
+    });
+    ul.appendChild(li);
+  });
+  btn.parentElement.appendChild(ul);
+  btn.addEventListener('click', ev => {
+    ev.stopPropagation();
+    ul.style.display = ul.style.display === 'none' ? 'block' : 'none';
+  });
+});
+const LISTAS_ABIERTAS = '.combo ul:not(.pre)';
+// Lo marcado en Color/Material. ?valorfuera=1: como el real, el valor se ve
+// en el recuadro del campo pero FUERA del botón (que solo dice «Color*»).
+function mostrar(btn, texto) {
+  if (params.get('valorlejos')) {
+    // Lo elegido se ve en otro sitio de la página: el bot NO puede leerlo.
+    let zona = document.getElementById('valores-lejos');
+    if (!zona) { zona = document.createElement('div'); zona.id = 'valores-lejos'; document.body.appendChild(zona); }
+    let v = zona.querySelector(`[data-de="${btn.getAttribute('aria-label')}"]`);
+    if (!v) { v = document.createElement('span'); v.dataset.de = btn.getAttribute('aria-label'); zona.appendChild(v); }
+    v.textContent = texto;
+    return;
+  }
+  if (!params.get('valorfuera')) { btn.textContent = texto || btn.getAttribute('aria-label'); return; }
+  let valor = btn.parentElement.querySelector('.valor');
+  if (!valor) {
+    valor = document.createElement('span'); valor.className = 'valor';
+    btn.insertAdjacentElement('afterend', valor);
+  }
+  valor.textContent = texto;
+}
+document.querySelectorAll('[role=combobox]:not(#cat):not([data-prerender])').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll(LISTAS_ABIERTAS).forEach(u => u.remove());
+    btn.dataset.antes = btn.textContent;
+    delete btn.dataset.pend;
+    // ?seleccionar=1: como el Wallapop real (tu vídeo), Color y Material solo
+    // se guardan al pulsar el botón verde «Seleccionar» de la lista.
+    const conBoton = btn.dataset.multi && params.get('seleccionar');
+    const ul = document.createElement('ul'); ul.setAttribute('role','listbox');
+    if (conBoton) {
+      // Cabecera como la real: «Selecciona hasta 2 colores   Borrar».
+      const borrar = document.createElement('button'); borrar.type = 'button'; borrar.textContent = 'Borrar';
+      borrar.addEventListener('click', ev => {
+        ev.stopPropagation();
+        btn.dataset.pend = '';
+        mostrar(btn, '');
+      });
+      ul.appendChild(borrar);
+    }
+    btn.dataset.options.split('|').forEach(o => {
+      const li = document.createElement('li'); li.setAttribute('role','option'); li.textContent = o;
+      const marcadas = () => new Set((btn.dataset.sel || '').split('|').filter(Boolean));
+      // ?sinestado=1: la lista NO dice qué opciones están marcadas.
+      const conEstado = !params.get('sinestado');
+      if (btn.dataset.multi && conEstado) li.setAttribute('aria-selected', marcadas().has(o) ? 'true' : 'false');
+      li.addEventListener('click', () => {
+        if (btn.dataset.multi && params.get('primerclicnulo') && !btn.dataset.ignorado) {
+          btn.dataset.ignorado = '1';  // el primer clic no llega (la lista aún se abría)
+          return;
+        }
+        if (conBoton) {
+          const pend = new Set((btn.dataset.pend ?? btn.dataset.sel ?? '').split('|').filter(Boolean));
+          pend.has(o) ? pend.delete(o) : pend.add(o);
+          btn.dataset.pend = [...pend].join('|');
+          mostrar(btn, [...pend].join(', '));
+          return;
+        }
+        if (btn.dataset.multi) {
+          // Varias opciones (como Color en Wallapop): marca/desmarca y la lista
+          // SE QUEDA ABIERTA, tapando los campos de debajo.
+          const sel = marcadas();
+          sel.has(o) ? sel.delete(o) : sel.add(o);
+          btn.dataset.sel = [...sel].join('|');
+          if (conEstado) li.setAttribute('aria-selected', sel.has(o) ? 'true' : 'false');
+          const texto = [...sel].join(', ');
+          // ?multilento=1: el campo tarda en mostrar lo marcado (como el real).
+          if (params.get('multilento')) setTimeout(() => { mostrar(btn, texto); }, 4500);
+          else mostrar(btn, texto);
+          return;
+        }
+        btn.textContent = o; ul.remove();
+      });
+      ul.appendChild(li);
+    });
+    if (conBoton) {
+      const ok = document.createElement('button'); ok.type = 'button'; ok.textContent = 'Seleccionar';
+      ok.addEventListener('click', ev => {
+        ev.stopPropagation();
+        btn.dataset.sel = btn.dataset.pend ?? btn.dataset.sel ?? '';
+        delete btn.dataset.pend;
+        ul.remove();
+      });
+      ul.appendChild(ok);
+    }
+    btn.parentElement.appendChild(ul);
+  });
+});
+if (params.get('ubic') === 'boton') {
+  // Como el Wallapop real: «Marca la localización» es una caja (no un campo
+  // de texto) que abre una ventana con el buscador de direcciones.
+  const inp = document.getElementById('ubic-busca');
+  const caja = document.createElement('div');
+  caja.id = 'ubic-caja'; caja.textContent = 'Marca la localización';
+  // ?ubicinicial=1: como tu cuenta, ya pone «08007, Barcelona».
+  if (params.get('ubicinicial')) {
+    // Como el real: la etiqueta y, debajo, la dirección (dos líneas).
+    caja.innerHTML = '<div>Marca la localización</div><div>08007, Barcelona</div>';
+    document.getElementById('ubic').textContent = 'Barcelona';
+  }
+  caja.style.cssText = 'border:1px solid #c00;padding:10px;cursor:pointer';
+  inp.replaceWith(caja);
+  const dlg = document.createElement('div');
+  dlg.setAttribute('role', 'dialog'); dlg.hidden = true;
+  dlg.innerHTML = '<p>¿Dónde quieres que se vean tus productos?</p>';
+  dlg.appendChild(inp); inp.placeholder = 'Busca una dirección';
+  dlg.appendChild(document.getElementById('ubic-sug'));
+  caja.after(dlg);
+  caja.addEventListener('click', () => { dlg.hidden = false; });
+  // Al abrir la página el cursor está en el buscador de la cabecera.
+  document.getElementById('buscador').focus();
+}
+if (params.get('extras') === 'no') {
+  // Variante: Wallapop cambia y NO muestra envío ni ubicación.
+  document.querySelector('.fila').remove();
+  document.getElementById('ubic-busca').remove();
+}
+// ?iaprevio=1: la IA de Wallapop ya ha marcado «Gris» en la lista de Color,
+// pero el campo todavía no lo muestra.
+if (params.get('iaprevio')) {
+  const color = document.querySelector('[aria-label="Color*"]');
+  color.dataset.sel = 'Gris';
+  if (params.get('valorfuera')) mostrar(color, 'Gris');
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  // Como Wallapop: Escape CANCELA lo elegido en la lista abierta.
+  document.querySelectorAll('.combo .pre').forEach(u => u.style.display = 'none');
+  document.querySelectorAll(LISTAS_ABIERTAS).forEach(u => {
+    const b = u.parentElement.querySelector('[role=combobox]');
+    if (b && b.dataset.antes !== undefined) b.textContent = b.dataset.antes;
+    u.remove();
+  });
+});
+// Clic fuera: cierra la lista y CONSERVA lo elegido.
+document.addEventListener('click', e => {
+  if (e.target.closest('.combo')) return;
+  document.querySelectorAll(LISTAS_ABIERTAS).forEach(u => {
+    // Sin pulsar «Seleccionar», lo marcado se PIERDE (como en el real).
+    const b = u.parentElement.querySelector('[role=combobox]');
+    if (b && b.dataset.pend !== undefined) {
+      mostrar(b, (b.dataset.sel || '').split('|').filter(Boolean).join(', '));
+      delete b.dataset.pend;
+    }
+    u.remove();
+  });
+  document.querySelectorAll('.combo .pre').forEach(u => u.style.display = 'none');
+});
+function mostrarFotos(e) {
+  for (const file of e.target.files) {
+    setTimeout(() => {
+      const d = document.createElement('div'); d.dataset.testid = 'image-preview';
+      d.setAttribute('data-testid','image-preview');
+      const img = document.createElement('img'); img.src = URL.createObjectURL(file);
+      d.appendChild(img); document.getElementById('previews').appendChild(d);
+      document.getElementById('continuar-fotos').disabled = false;
+    }, 400);
+  }
+}
+if (params.get('modo') === 'boton') {
+  // Como algunas webs: el campo de archivos no existe hasta pulsar el botón.
+  document.getElementById('fotos').remove();
+  document.getElementById('subir-fotos').remove();
+  const boton = document.getElementById('boton-fotos');
+  boton.hidden = false;
+  boton.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
+    input.addEventListener('change', mostrarFotos);
+    input.click();
+  });
+} else {
+  document.getElementById('fotos').addEventListener('change', mostrarFotos);
+  document.getElementById('subir-fotos').addEventListener('click', () => document.getElementById('fotos').click());
+}
+document.getElementById('ubic-busca')?.addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  const ul = document.getElementById('ubic-sug'); ul.innerHTML = '';
+  // Como el real: al escribir «Barcelona» salen ANTES otras ciudades de la provincia.
+  ['Madrid, Madrid', 'Valencia, Valencia', "L'Hospitalet de Llobregat, Barcelona",
+   'Sant Feliu de Llobregat, Barcelona', 'Barcelona, Barcelona', 'Sevilla, Sevilla']
+    .filter(c => q && c.toLowerCase().includes(q)).forEach(c => {
+      const li = document.createElement('div'); li.className = 'sug'; li.setAttribute('role', 'option'); li.textContent = c;
+      // ?ubicicono=1: cada sugerencia empieza con un icono de texto, como el real.
+      if (params.get('ubicicono')) {
+        const icono = document.createElement('div'); icono.textContent = 'location_on';
+        li.prepend(icono);
+      }
+      li.addEventListener('click', () => {
+        document.getElementById('ubic').textContent = c.split(',')[0];
+        document.getElementById('ubic-busca').value = c;
+        ul.innerHTML = '';
+        const caja = document.getElementById('ubic-caja');
+        if (caja) { caja.textContent = c; caja.nextElementSibling.hidden = true; }
+      });
+      ul.appendChild(li);
+    });
+});
+if (params.get('marca') === 'texto') {
+  // Variante: «Marca» es un campo para ESCRIBIR con sugerencias.
+  document.getElementById('marca-combo').outerHTML =
+    '<input id="marca" aria-label="Marca" autocomplete="off"><div id="marca-sug"></div>';
+}
+document.getElementById('marca')?.addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  const sug = document.getElementById('marca-sug'); sug.innerHTML = '';
+  ['Pikolin', 'Pikolin Home', 'Flex', 'Ikea'].filter(m => q && m.toLowerCase().startsWith(q))
+    .forEach(m => {
+      const d = document.createElement('div'); d.setAttribute('role', 'option'); d.textContent = m;
+      d.addEventListener('click', () => { e.target.value = m; sug.innerHTML = ''; });
+      sug.appendChild(d);
+    });
+});
+document.getElementById('subir').addEventListener('click', () => {
+  const data = {
+    titulo: document.getElementById('title').value,
+    descripcion: document.getElementById('description').value,
+    categoria: document.getElementById('cat').dataset.elegida || '',
+    ubicacion: document.getElementById('ubic').textContent,
+    buscador_cabecera: document.getElementById('buscador').value,
+    envio: document.getElementById('envio') ? document.getElementById('envio').checked : null,
+    precio: document.getElementById('sale_price').value,
+    marca: document.getElementById('marca') ? document.getElementById('marca').value
+      : ((b => b && b.textContent !== 'Marca' ? b.textContent : '')(document.querySelector('[aria-label=Marca]'))),
+    fotos: document.querySelectorAll('[data-testid=image-preview]').length,
+    color: (document.querySelector('[aria-label="Color*"]')?.dataset.sel || '').split('|').filter(Boolean).join(', '),
+    material: (document.querySelector('[aria-label="Material*"]')?.dataset.sel || '').split('|').filter(Boolean).join(', '),
+  };
+  fetch('/publicar', {method:'POST', body: JSON.stringify(data)})
+    .then(r => r.json()).then(j => {
+      // ?sinurl=1: como el Wallapop real, tras publicar NO se ve la dirección
+      // del anuncio (se vuelve a «Tus productos»… sin enlace al nuevo).
+      // ?mudo=1: se publica pero la página no dice nada (sin confirmación).
+      if (params.get('mudo')) { document.body.innerHTML = '<p>…</p>'; }
+      else if (params.get('sinurl')) { document.body.innerHTML = '<h1>Producto subido</h1><p>Tu producto ya está a la venta.</p>'; }
+      else { location.href = '/item/' + j.id; }
+    });
+});
+</script>
+</body></html>
