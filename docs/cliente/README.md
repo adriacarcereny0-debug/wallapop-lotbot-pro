@@ -16,6 +16,7 @@ cuentas de Wallapop.
 6. [Cómo gestionar tus anuncios](06-como-gestionar-anuncios.md)
 7. [Cómo responder a los compradores](07-como-responder-a-compradores.md)
 8. [Cómo configurar las automatizaciones](08-como-configurar-automatizaciones.md)
+9. [**Conectar Wallapop y publicar en masa (sin navegador)**](09-conectar-wallapop-y-publicar-en-masa.md)
 
 ## Las tres reglas de LOT Bot
 
@@ -39,6 +40,8 @@ técnico, LOT Bot te dice cuál en vez de pedirte algo que no tienes.
 
 | Pantalla | Para qué |
 |---|---|
+| **Conectar Wallapop** | Conectar tus cuentas sin navegador, comprobar, renovar y reconectar |
+| **Publicación masiva** | Publicar cientos de anuncios en cola, ver errores y reintentar |
 | **Panel** | Resumen de todo: cuentas, anuncios, avisos |
 | **Asistente IA** | Dile lo que quieres hacer, en tus palabras |
 | **Cuentas de Wallapop** | Añadir, conectar, reautenticar y sincronizar tus cuentas |

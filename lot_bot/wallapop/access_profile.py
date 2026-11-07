@@ -36,6 +36,55 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
+class UsageLimits:
+    """Límites y condiciones de uso declarados por Wallapop (bloque `limits:`).
+
+    Todos son opcionales. Lo que no se declara usa el valor prudente de LOT
+    Bot, nunca uno más agresivo.
+    """
+
+    #: Segundos mínimos entre dos publicaciones (cualquier cuenta).
+    min_seconds_between_publications: int | None = None
+    #: Máximo de anuncios nuevos por cuenta y día (None = sin límite declarado).
+    max_publications_per_day: int | None = None
+    #: Máximo de peticiones por minuto (todas las operaciones).
+    max_requests_per_minute: int | None = None
+    #: Cabecera de idempotencia admitida por el servicio (p. ej.
+    #: «Idempotency-Key»). Si existe, un reintento nunca duplica un anuncio.
+    idempotency_header: str = ""
+    #: Fotografías máximas por anuncio.
+    max_images_per_item: int = 10
+    #: User-Agent que exige Wallapop, si exige alguno.
+    user_agent: str = ""
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any] | None) -> UsageLimits:
+        raw = raw or {}
+
+        def _int(key: str) -> int | None:
+            value = raw.get(key)
+            if value in (None, ""):
+                return None
+            try:
+                number = int(value)
+            except (TypeError, ValueError) as exc:
+                raise ConfigurationError(
+                    f"limits.{key} debe ser un número entero.",
+                    user_message=f"El perfil de acceso tiene un valor no válido en limits.{key}.",
+                ) from exc
+            return number if number > 0 else None
+
+        return cls(
+            min_seconds_between_publications=_int("min_seconds_between_publications"),
+            max_publications_per_day=_int("max_publications_per_day"),
+            max_requests_per_minute=_int("max_requests_per_minute"),
+            idempotency_header=str(raw.get("idempotency_header") or "").strip(),
+            max_images_per_item=_int("max_images_per_item") or 10,
+            user_agent=str(raw.get("user_agent") or "").strip(),
+        )
+
+
+@dataclass(slots=True)
 class AccessProfile:
     """Perfil completo: autenticacion + transporte + operaciones."""
 
@@ -45,6 +94,11 @@ class AccessProfile:
     authorization_ref: str = ""
     notes: str = ""
     source_path: Path | None = None
+    #: «provisional» (credencial de integración autorizada) u «oficial» (API
+    #: oficial de Wallapop). Solo documental: el comportamiento lo decide el
+    #: contenido del perfil, no esta etiqueta.
+    provider: str = ""
+    limits: UsageLimits = field(default_factory=UsageLimits)
 
     # -- Consulta ---------------------------------------------------------
     @property
@@ -173,6 +227,8 @@ class AccessProfile:
                 header_name=str(delegated_raw.get("header_name") or "Authorization"),
                 header_format=str(delegated_raw.get("header_format") or "Bearer {credential}"),
                 instructions=str(delegated_raw.get("instructions") or ""),
+                portal_url=str(delegated_raw.get("portal_url") or "").strip(),
+                documentation_url=str(delegated_raw.get("documentation_url") or "").strip(),
                 expires_after_minutes=delegated_raw.get("expires_after_minutes"),
                 validation_operation=str(
                     delegated_raw.get("validation_operation") or "account_profile"
@@ -191,6 +247,8 @@ class AccessProfile:
             authorized_by=str(meta.get("authorized_by") or ""),
             authorization_ref=str(meta.get("authorization_ref") or ""),
             notes=str(meta.get("notes") or ""),
+            provider=str(meta.get("provider") or "").strip().lower(),
+            limits=UsageLimits.from_dict(data.get("limits")),
         )
 
 

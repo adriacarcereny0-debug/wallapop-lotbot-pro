@@ -74,9 +74,13 @@ class Settings(BaseSettings):
     #: «navegador» = integración mediante navegador con sesión del usuario.
     #: Normalmente se elige en Configuración → Wallapop (se guarda en la base
     #: de datos local); esta variable solo sirve para forzarlo.
-    wallapop_integration: Literal["", "perfil", "navegador"] = Field(
+    wallapop_integration: Literal["", "perfil", "oficial", "navegador", "demo"] = Field(
         default="", alias="LOT_BOT_WALLAPOP_INTEGRATION"
     )
+    #: Perfil de la API OFICIAL de Wallapop (cuando se conceda el acceso).
+    #: Mismo formato que el perfil provisional: cambiar de uno a otro es
+    #: cambiar de fichero, no de programa.
+    wallapop_official_profile: str = Field(default="", alias="WALLAPOP_OFFICIAL_PROFILE")
 
     # --- IA ---
     ai_provider: Literal["anthropic", "rules"] = Field(default="rules", alias="LOT_BOT_AI_PROVIDER")
@@ -127,6 +131,29 @@ class Settings(BaseSettings):
         path = Path(raw).expanduser()
         if not path.is_absolute():
             # Relativa al programa, no a la carpeta desde la que se lanzo.
+            for base in (app_dir(), Path.cwd()):
+                if (base / path).is_file():
+                    return base / path
+            return app_dir() / path
+        return path
+
+    @property
+    def official_profile_path(self) -> Path | None:
+        """Ruta del perfil de la API oficial (WALLAPOP_OFFICIAL_PROFILE).
+
+        Sin variable, se busca `official_api.local.yaml` en config/.
+        """
+        raw = self.wallapop_official_profile
+        if not raw:
+            for candidate in (
+                app_dir() / "config" / "official_api.local.yaml",
+                get_paths().config / "official_api.local.yaml",
+            ):
+                if candidate.is_file():
+                    return candidate
+            return None
+        path = Path(raw).expanduser()
+        if not path.is_absolute():
             for base in (app_dir(), Path.cwd()):
                 if (base / path).is_file():
                     return base / path

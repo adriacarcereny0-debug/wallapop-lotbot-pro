@@ -31,6 +31,7 @@ from lot_bot.images.generation import (
     ImageGenerator,
 )
 from lot_bot.images.service import ImageService
+from lot_bot.integration import DirectIntegration, build_integration
 from lot_bot.logs.setup import configure_logging
 from lot_bot.market.service import MarketService
 from lot_bot.master_ad.service import MasterAdService
@@ -91,7 +92,35 @@ class Application:
     stats: StatsService = None  # type: ignore[assignment]
     analyzer: StatsAnalyzer = None  # type: ignore[assignment]
     optimizer: Optimizer = None  # type: ignore[assignment]
+    #: Integración directa (sin navegador): autenticación, cliente, cola,
+    #: fotos, motor de publicación y base de datos. Ver lot_bot/integration.
+    direct: DirectIntegration = None  # type: ignore[assignment]
     business_settings: dict[str, Any] = field(default_factory=dict)
+
+    # -- Acceso directo a las piezas de la integración directa ------------
+    @property
+    def auth_manager(self):
+        return self.direct.auth
+
+    @property
+    def wallapop_client(self):
+        return self.direct.client
+
+    @property
+    def publication_engine(self):
+        return self.direct.engine
+
+    @property
+    def queue_manager(self):
+        return self.direct.queue
+
+    @property
+    def image_manager(self):
+        return self.direct.images
+
+    @property
+    def database_manager(self):
+        return self.direct.database
 
     # ------------------------------------------------------------------
     @property
@@ -153,8 +182,11 @@ class Application:
         return load_integration_mode(self.db)
 
     def set_integration_mode(self, mode: str) -> WallapopBackend:
-        """«navegador» (sesión del usuario) o «demo». Se guarda en local."""
-        if mode not in ("navegador", "demo"):
+        """«navegador», «perfil» (conexión directa provisional), «oficial»
+        (API oficial) o «demo». Se guarda en local."""
+        from lot_bot.wallapop.factory import INTEGRATION_MODES
+
+        if mode not in INTEGRATION_MODES:
             raise ValueError(f"Modo de integración desconocido: {mode}")
         with self.db.session_scope() as session:
             row = session.get(Setting, INTEGRATION_SETTINGS_KEY)
@@ -206,6 +238,8 @@ class Application:
 
     def shutdown(self) -> None:
         try:
+            if self.direct is not None:
+                self.direct.shutdown()
             if self.publish_queue is not None:
                 self.publish_queue.shutdown()
             close_browsers = getattr(self.backend.service, "shutdown", None)
@@ -346,11 +380,17 @@ def create_application(
     app.analyzer = StatsAnalyzer(app.stats)
     app.optimizer = Optimizer(app.analyzer)
 
+    app.direct = build_integration(app)
+
     app.automations.ensure_definitions()
     if start_scheduler:
-        # Lo único que se automatiza es la cola de publicación (≥ 60 s entre
+        # Lo único que se automatiza es la publicación (≥ 60 s entre
         # anuncios). Las tareas programadas antiguas ya no se arrancan.
         app.publish_queue.start_worker()
+        app.direct.engine.start_worker()
+    else:
+        # Sin hilo (pruebas): igualmente se recupera lo interrumpido.
+        app.direct.queue.recover_interrupted()
 
     seed_business_from_env(app)
 

@@ -59,6 +59,11 @@ class DelegatedCredentialConfig:
     header_name: str = "Authorization"
     header_format: str = "Bearer {credential}"
     instructions: str = ""
+    #: Página DOCUMENTADA por Wallapop donde el titular obtiene la credencial
+    #: (procedimiento de transferencia manual). Vacía = no se abre nada.
+    portal_url: str = ""
+    #: Documentación pública del procedimiento, si existe.
+    documentation_url: str = ""
     expires_after_minutes: int | None = None
     validation_operation: str = "account_profile"
     #: True solo si el perfil declara explicitamente este bloque. El formato

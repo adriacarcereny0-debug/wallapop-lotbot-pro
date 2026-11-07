@@ -33,6 +33,8 @@
 
 meta:
   # Documental: de quién procede la autorización y su referencia.
+  # provider: "provisional" (credencial de integración) u "oficial" (API oficial)
+  provider: "provisional"
   authorized_by: ""
   authorization_ref: ""
   notes: ""
@@ -95,10 +97,18 @@ auth:
   # NO es una API key de aplicación: es un valor que Wallapop emite para UNA
   # cuenta concreta y que el titular introduce una sola vez.
   # Deja el bloque comentado si no es tu caso.
+  #
+  # Es la «credencial de integración provisional» de la pantalla «Conectar
+  # Wallapop»: el cliente la pega allí, LOT Bot la guarda cifrada y la
+  # valida contra la operación indicada. Si Wallapop documenta una página
+  # para obtenerla (transferencia manual), indícala en `portal_url`: el botón
+  # «Iniciar conexión» la abrirá en el navegador habitual del cliente.
   # delegated_credential:
   #   header_name: "Authorization"
   #   header_format: "Bearer {credential}"
   #   instructions: "Dónde obtiene el usuario esta credencial."
+  #   portal_url: ""          # página documentada por Wallapop (https://…)
+  #   documentation_url: ""   # documentación pública del procedimiento
   #   expires_after_minutes:
   #   validation_operation: "account_profile"
 
@@ -166,6 +176,19 @@ operations:
 
   # ---- Datos de mercado ----
   market_data:
+
+# ---------------------------------------------------------------------
+# 4. LÍMITES Y CONDICIONES DE USO (los que indique Wallapop)
+# ---------------------------------------------------------------------
+# Lo que quede vacío usa el valor prudente de LOT Bot (60 s entre
+# publicaciones, sin superar nunca lo que Wallapop declare).
+limits:
+  min_seconds_between_publications:   # p. ej. 60
+  max_publications_per_day:           # por cuenta
+  max_requests_per_minute:            # todas las operaciones
+  idempotency_header: ""              # p. ej. "Idempotency-Key", si existe
+  max_images_per_item: 10
+  user_agent: ""                      # si Wallapop exige uno concreto
 
 # =====================================================================
 # EJEMPLO ILUSTRATIVO DEL FORMATO

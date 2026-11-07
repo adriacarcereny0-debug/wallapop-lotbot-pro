@@ -23,6 +23,27 @@ desde un único programa, con un asistente de IA que interpreta órdenes en espa
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## Novedad: conexión directa con Wallapop, sin navegador
+
+Dos pantallas nuevas sustituyen el control del navegador por una conexión
+directa con el acceso que Wallapop autorice:
+
+* **Conectar Wallapop** — iniciar la conexión, pegar la credencial de
+  integración provisional, validar, comprobar, renovar, reconectar y
+  desconectar cada cuenta, con estado, última conexión e historial.
+* **Publicación masiva** — cola persistente para cientos de anuncios
+  (formulario o CSV), publicación secuencial con intervalo mínimo, fotos,
+  detección de duplicados y recuperación de publicaciones interrumpidas.
+
+La cola **nunca se pierde** (errores de autenticación, red, cierres
+inesperados o anuncios rechazados) y la **API oficial** se activa cambiando
+el perfil de acceso, sin tocar el programa. LOT Bot no extrae cookies del
+navegador ni usa tokens internos ni intenta saltarse verificaciones.
+
+Detalle técnico: [`docs/dev/conexion-directa.md`](docs/dev/conexion-directa.md) ·
+Guía para el cliente: [`docs/cliente/09-conectar-wallapop-y-publicar-en-masa.md`](docs/cliente/09-conectar-wallapop-y-publicar-en-masa.md).
+El sistema anterior por navegador sigue disponible.
+
 ## Qué hace
 
 * **Multicuenta real.** Cada cuenta está aislada: anuncios, estadísticas, sesión de navegador y
@@ -153,7 +174,8 @@ Copia `.env.example` a `.env`:
 
 ```dotenv
 LOT_BOT_DEMO_MODE=true            # false para el acceso real
-WALLAPOP_ACCESS_PROFILE=          # ruta al perfil de acceso autorizado
+WALLAPOP_ACCESS_PROFILE=          # perfil de la credencial provisional autorizada
+WALLAPOP_OFFICIAL_PROFILE=        # perfil de la API oficial (cuando se conceda)
 WALLAPOP_REDIRECT_URI=http://127.0.0.1:8723/callback
 LOT_BOT_AI_PROVIDER=rules         # 'anthropic' para lenguaje natural libre
 ANTHROPIC_API_KEY=
@@ -193,12 +215,15 @@ lot_bot/
 ├── images/           importación y deduplicación de fotos
 ├── master_ad/        anuncio principal (plantilla fija de canapés)
 ├── publishing/       vista previa, publicación, espejo de anuncios
+├── integration/      conexión directa sin navegador:
+│                     AuthenticationManager, WallapopClient, PublicationEngine,
+│                     QueueManager, ImageManager, DatabaseManager
 ├── messages/         bandeja de entrada y asistente de ventas
 ├── market/           análisis de precios
 ├── automation/       tareas programadas
 ├── ai/               proveedores, herramientas y orquestador
 ├── core/             auditoría y eventos
-├── ui/               ventana principal, tema y 13 pantallas
+├── ui/               ventana principal, tema y 15 pantallas
 └── bootstrap.py      ensamblado de servicios
 ```
 
@@ -211,6 +236,7 @@ lot_bot/
 | [Arquitectura](docs/dev/arquitectura.md) | Diseño, capas, agente IA, multicuenta |
 | [Instalación](docs/dev/instalacion.md) | Entorno de desarrollo y pruebas |
 | [Variables de entorno](docs/dev/variables-entorno.md) | Todas las opciones |
+| [**Conexión directa (sin navegador)**](docs/dev/conexion-directa.md) | Nueva arquitectura, cola persistente, transición a la API oficial |
 | [Conexión con Wallapop](docs/dev/conexion-wallapop.md) | Configurar el acceso autorizado |
 | [Qué pedir a Wallapop](docs/dev/que-pedir-a-wallapop.md) | Lista exacta de datos técnicos a solicitar |
 | [Navegador, cola e imágenes](docs/dev/integracion-navegador.md) | Publicación por navegador, cola de 60 s, FLUX.2 Pro |
@@ -245,6 +271,9 @@ tecnicismos. Empieza por [uso-lot-bot.md](docs/cliente/uso-lot-bot.md).
 | Publicar en Wallapop mediante navegador (sesión del usuario, uso personal autorizado) | ✅ Selectores pendientes de verificar en la web real ([detalles](docs/dev/integracion-navegador.md)) |
 | Cola de publicación con intervalo mínimo de 60 s | ✅ |
 | Una imagen generada por anuncio (FLUX.2 Pro) y detección de repetidas | ✅ |
+| Conexión directa sin navegador («Conectar Wallapop») | ✅ Lista; se activa con el perfil que facilite Wallapop |
+| Publicación masiva con cola persistente y recuperación | ✅ |
+| API oficial de Wallapop | ⚙️ Preparada: mismo motor, solo falta el perfil oficial ([detalles](docs/dev/conexion-directa.md#transición-a-la-api-oficial)) |
 | Acceso por API/perfil de acceso | ⚙️ Arquitectura lista, sin datos de Wallapop (ver [qué pedir](docs/dev/que-pedir-a-wallapop.md)) |
 | Datos de mercado externos | ⚙️ Solo con fuente autorizada; sin ella se avisa |
 

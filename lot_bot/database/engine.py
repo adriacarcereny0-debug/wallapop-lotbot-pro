@@ -16,7 +16,7 @@ from lot_bot.database.models import Base
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 #: Columnas añadidas después de la primera versión. Se crean solas al
 #: arrancar en bases de datos antiguas, sin perder datos.

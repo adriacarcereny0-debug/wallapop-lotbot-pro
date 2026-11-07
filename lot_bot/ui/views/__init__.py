@@ -4,7 +4,9 @@ from lot_bot.ui.views.accounts import AccountsView
 from lot_bot.ui.views.assistant import AssistantView
 from lot_bot.ui.views.automations import AutomationsView
 from lot_bot.ui.views.base import BaseView
+from lot_bot.ui.views.connect_wallapop import ConnectWallapopView
 from lot_bot.ui.views.dashboard import DashboardView
+from lot_bot.ui.views.direct_publish import DirectPublishView
 from lot_bot.ui.views.history import HistoryView
 from lot_bot.ui.views.image_studio import ImageStudioView
 from lot_bot.ui.views.listings import ListingsView
@@ -31,5 +33,7 @@ __all__ = [
     "MasterAdView",
     "PublishQueueView",
     "StatisticsView",
+    "ConnectWallapopView",
+    "DirectPublishView",
     "ImageStudioView",
 ]

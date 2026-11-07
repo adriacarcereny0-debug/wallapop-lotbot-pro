@@ -25,7 +25,9 @@ from lot_bot.ui import icons, theme
 from lot_bot.ui.views import (
     AccountsView,
     AssistantView,
+    ConnectWallapopView,
     DashboardView,
+    DirectPublishView,
     HistoryView,
     ImageStudioView,
     ListingsView,
@@ -47,6 +49,8 @@ logger = logging.getLogger(__name__)
 NAVIGATION = [
     # --- Lo principal ---
     ("Asistente IA", "asistente", AssistantView),
+    ("Conectar Wallapop", "conectar", ConnectWallapopView),
+    ("Publicación masiva", "masiva", DirectPublishView),
     ("Cuentas de Wallapop", "cuentas", AccountsView),
     ("Publicación automática", "publicacion", PublishQueueView),
     ("Anuncios (eliminar)", "anuncios", ListingsView),
@@ -220,8 +224,19 @@ class MainWindow(QMainWindow):
             connected = sum(1 for a in accounts if a.is_connected and not a.is_demo)
             detail = f"{backend.label}\nDatos en:\n{self.app.paths.root}"
 
+        queue = ""
+        direct = getattr(self.app, "direct", None)
+        if direct is not None:
+            try:
+                counts = direct.queue.counts()
+                queue = (
+                    f"   ·   Cola: {counts['pendientes']} pendientes, "
+                    f"{counts['published']} publicados, {counts['errores']} con error"
+                )
+            except Exception:  # la barra de estado nunca debe romper la ventana
+                logger.debug("No se han podido leer los contadores de la cola", exc_info=True)
         self.status_label.setText(
-            f"  {mode}   ·   {connected}/{len(accounts)} cuentas conectadas   ·   "
+            f"  {mode}   ·   {connected}/{len(accounts)} cuentas conectadas{queue}   ·   "
             f"Asistente: {self.app.agent.provider.describe()}"
         )
         self.brand_sub.setText(backend.label)

@@ -418,6 +418,40 @@ class AccountManager:
         self.store_credential(internal_ref, renewed)
         return renewed
 
+    def has_credential(self, internal_ref: str) -> bool:
+        """True si la cuenta tiene una credencial guardada (sin descifrarla)."""
+        with self._db.session_scope() as session:
+            account = self._find(session, internal_ref)
+            return bool(account is not None and account.credential_enc)
+
+    def credential_expires_at(self, internal_ref: str) -> datetime | None:
+        """Caducidad conocida de la credencial (sin descifrarla)."""
+        info = self.get_account(internal_ref)
+        return info.token_expires_at if info else None
+
+    def force_renew(self, internal_ref: str) -> bool:
+        """Renueva la credencial ahora, si el mecanismo lo permite.
+
+        True si se ha renovado. False si el mecanismo no sabe renovar (el
+        usuario tiene que volver a conectar); la credencial actual se
+        conserva tal cual.
+        """
+        with self._db.session_scope() as session:
+            account = self._find(session, internal_ref)
+            ciphertext = account.credential_enc if account is not None else None
+        if not ciphertext:
+            return False
+        credential = self._decrypt(ciphertext)
+        try:
+            renewed = self._auth.renew(credential)
+        except Exception as exc:
+            logger.warning("Fallo al renovar '%s': %s", internal_ref, type(exc).__name__)
+            return False
+        if renewed is None:
+            return False
+        self.store_credential(internal_ref, renewed)
+        return True
+
     def credential_provider(self):
         """Callable listo para inyectar en `AuthorizedWallapopService`."""
         return self.get_credential

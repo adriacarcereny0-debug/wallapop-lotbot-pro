@@ -591,3 +591,136 @@ class ListingStat(Base):
     #: «navegador» (leído en la web) o «demo» (simulado).
     source: Mapped[str] = mapped_column(String(20), nullable=False)
     extra: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+# ---------------------------------------------------------------------------
+# Motor de publicación directa (sin navegador)
+# ---------------------------------------------------------------------------
+class AdQueueStatus(str, enum.Enum):
+    """Estado de un anuncio en la cola persistente del motor directo.
+
+    El ciclo normal es PENDING → PROCESSING → PUBLISHED. Ningún estado se
+    pierde: un error de red, de autenticación o un cierre inesperado dejan el
+    anuncio en un estado recuperable, nunca lo borran.
+    """
+
+    #: Esperando turno (también tras un error recuperable o una reconexión).
+    PENDING = "pending"
+    #: El motor lo está publicando ahora mismo.
+    PROCESSING = "processing"
+    #: Se interrumpió a mitad (cierre, corte de red tras enviar): hay que
+    #: comprobar en Wallapop si llegó a publicarse ANTES de reintentar.
+    VERIFYING = "verifying"
+    #: No se ha podido saber si se publicó: lo decide el usuario (así nunca
+    #: se duplica un anuncio por un reintento a ciegas).
+    NEEDS_REVIEW = "needs_review"
+    PUBLISHED = "published"
+    #: Error definitivo (datos rechazados, fotos no válidas, sin reintentos).
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class AdQueueItem(Base, TimestampMixin):
+    """Un anuncio a publicar por el motor directo, con todo su estado."""
+
+    __tablename__ = "ad_queue_items"
+    __table_args__ = (
+        Index("ix_ad_queue_status", "status", "priority", "id"),
+        Index("ix_ad_queue_fingerprint", "fingerprint"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_ref: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(8), nullable=False, default="EUR")
+    category: Mapped[str | None] = mapped_column(String(120))
+    condition: Mapped[str | None] = mapped_column(String(50))
+    attributes: Mapped[dict] = mapped_column(JSON, default=dict)
+    #: Rutas locales de las fotografías, en orden.
+    image_paths: Mapped[list] = mapped_column(JSON, default=list)
+    #: {hash de la foto: referencia remota} ya subidas (no se repiten al reintentar).
+    uploaded_images: Mapped[dict] = mapped_column(JSON, default=dict)
+    #: Huella del contenido (cuenta + título + precio + descripción) para
+    #: detectar duplicados.
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Clave única de esta publicación; se envía si el servicio lo admite
+    #: para que un reintento nunca cree un segundo anuncio.
+    idempotency_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    status: Mapped[AdQueueStatus] = mapped_column(
+        Enum(AdQueueStatus), default=AdQueueStatus.PENDING, nullable=False
+    )
+    priority: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    #: No se intenta antes de esta hora (reintentos con espera, límites diarios).
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    last_error_code: Mapped[str | None] = mapped_column(String(80))
+    remote_id: Mapped[str | None] = mapped_column(String(120))
+    remote_url: Mapped[str | None] = mapped_column(Text)
+    #: Etiqueta del lote (p. ej. el nombre del CSV importado).
+    batch: Mapped[str | None] = mapped_column(String(200))
+    source: Mapped[str] = mapped_column(String(40), default="manual", nullable=False)
+    product_id: Mapped[int | None] = mapped_column(Integer)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    events: Mapped[list[AdQueueEvent]] = relationship(
+        back_populates="item", cascade="all, delete-orphan", order_by="AdQueueEvent.id"
+    )
+
+
+class AdQueueEvent(Base):
+    """Historial de un anuncio de la cola (cada cambio de estado)."""
+
+    __tablename__ = "ad_queue_events"
+    __table_args__ = (Index("ix_ad_queue_events_item", "item_id", "id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(
+        ForeignKey("ad_queue_items.id", ondelete="CASCADE"), nullable=False
+    )
+    at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    item: Mapped[AdQueueItem] = relationship(back_populates="events")
+
+
+class WallapopConnection(Base, TimestampMixin):
+    """Estado de la conexión directa de una cuenta (sin credenciales).
+
+    Las credenciales siguen cifradas en `accounts.credential_enc`; aquí solo
+    se guarda lo que la interfaz necesita mostrar: estado, fechas, motivo.
+    """
+
+    __tablename__ = "wallapop_connections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_ref: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(40))
+    #: connected | needs_reconnect | not_connected | error | demo
+    auth_state: Mapped[str] = mapped_column(String(30), default="not_connected", nullable=False)
+    last_connected_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_validated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_check_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_check_ok: Mapped[bool | None] = mapped_column(Boolean)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    remote_login: Mapped[str | None] = mapped_column(String(200))
+
+
+class ConnectionEvent(Base):
+    """Historial de conexión: conectar, validar, comprobar, renovar, desconectar."""
+
+    __tablename__ = "wallapop_connection_events"
+    __table_args__ = (Index("ix_conn_events_account", "account_ref", "id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_ref: Mapped[str] = mapped_column(String(64), nullable=False)
+    at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    event: Mapped[str] = mapped_column(String(40), nullable=False)
+    ok: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(40))
+    detail: Mapped[str] = mapped_column(Text, nullable=False, default="")

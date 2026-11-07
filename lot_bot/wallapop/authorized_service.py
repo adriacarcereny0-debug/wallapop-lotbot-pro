@@ -87,6 +87,8 @@ class AuthorizedWallapopService(WallapopService):
         self._credential_provider = credential_provider
         self._client = client or httpx.Client(timeout=endpoint_map.timeout_seconds)
         self.auth_method_name = auth_method_name
+        #: Cabecera de idempotencia declarada en el perfil (`limits:`).
+        self.idempotency_header = ""
         if auth_method_name:
             self.backend_name = f"Wallapop · {auth_method_name}"
 
@@ -153,6 +155,7 @@ class AuthorizedWallapopService(WallapopService):
         account_ref: str,
         params: dict[str, Any] | None = None,
         extra_body: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Any:
         self.require(capability)
         operation = self.map.get(capability)
@@ -178,15 +181,24 @@ class AuthorizedWallapopService(WallapopService):
             account_ref,
             capability.value,
         )
+        headers = self._headers(credential, operation)
+        if extra_headers:
+            headers.update(extra_headers)
         try:
             response = self._client.request(
                 operation.method,
                 url,
                 params=query or None,
                 json=body,
-                headers=self._headers(credential, operation),
+                headers=headers,
                 cookies=credential.cookies or None,
             )
+        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+            # La conexión no llegó a abrirse: la petición NO salió.
+            raise NetworkError(
+                f"No se ha podido conectar en {capability.value}: {type(exc).__name__}",
+                request_sent=False,
+            ) from exc
         except httpx.TimeoutException as exc:
             raise NetworkError(f"Tiempo de espera agotado en {capability.value}.") from exc
         except httpx.HTTPError as exc:
@@ -356,7 +368,14 @@ class AuthorizedWallapopService(WallapopService):
             items = self.list_items(account_ref, limit=max(query.limit, 200))
         return _filter_items_locally(items, query)
 
-    def create_item(self, account_ref: str, draft: ItemDraft) -> OperationResult:
+    def create_item(
+        self, account_ref: str, draft: ItemDraft, idempotency_key: str | None = None
+    ) -> OperationResult:
+        extra_headers = None
+        if idempotency_key and self.idempotency_header:
+            # Declarado por Wallapop en `limits.idempotency_header`: un
+            # reintento con la misma clave no crea un segundo anuncio.
+            extra_headers = {self.idempotency_header: idempotency_key}
         payload = self._call(
             Capability.CREATE_ITEM,
             account_ref,
@@ -368,8 +387,10 @@ class AuthorizedWallapopService(WallapopService):
                 "category": draft.category,
                 "condition": draft.condition,
                 "images": draft.image_urls,
+                "idempotency_key": idempotency_key,
             },
             extra_body=draft.to_payload() if not self._has_body_template(Capability.CREATE_ITEM) else None,
+            extra_headers=extra_headers,
         )
         operation = self.map.get(Capability.CREATE_ITEM)
         assert operation is not None

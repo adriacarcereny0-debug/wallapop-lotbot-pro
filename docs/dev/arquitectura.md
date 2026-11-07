@@ -46,6 +46,7 @@ Reglas que sostienen el diseño:
 | `lot_bot/templates_engine` | Plantillas de anuncio con variables |
 | `lot_bot/images` | Importación, validación y deduplicación de fotografías |
 | `lot_bot/publishing` | Vista previa, publicación y espejo local de anuncios |
+| `lot_bot/integration` | Conexión directa sin navegador: autenticación, cliente, motor, cola, fotos y BD ([detalle](conexion-directa.md)) |
 | `lot_bot/messages` | Bandeja de entrada y asistente de ventas |
 | `lot_bot/market` | Análisis de precios con fuentes autorizadas |
 | `lot_bot/automation` | Tareas programadas (APScheduler) |

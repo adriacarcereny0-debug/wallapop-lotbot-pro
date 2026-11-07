@@ -99,6 +99,19 @@ class NetworkError(WallapopError):
     user_message = "No hay conexión con Wallapop. Comprueba tu conexión a internet."
     retryable = True
 
+    def __init__(
+        self,
+        detail: str = "",
+        *,
+        user_message: str | None = None,
+        request_sent: bool = True,
+    ) -> None:
+        #: False solo si consta que la petición NO llegó a salir (no se pudo
+        #: abrir la conexión). Si es True, Wallapop pudo haberla procesado:
+        #: una publicación debe comprobarse antes de repetirse.
+        self.request_sent = request_sent
+        super().__init__(detail, user_message=user_message)
+
 
 class ServiceUnavailableError(WallapopError):
     user_message = "Wallapop no está disponible en este momento. Vuelve a intentarlo más tarde."

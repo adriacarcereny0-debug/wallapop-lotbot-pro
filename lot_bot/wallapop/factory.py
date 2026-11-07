@@ -43,13 +43,28 @@ class WallapopBackend:
     #: Lista concreta de lo que falta para poder conectar de verdad.
     missing: list[str] = field(default_factory=list)
 
+    #: «demo», «navegador», «perfil» (conexión directa provisional) u
+    #: «oficial» (API oficial de Wallapop).
+    provider: str = "demo"
+
     @property
     def label(self) -> str:
         if self.demo:
             return "MODO DEMO"
         if self.auth_method.kind.value == "browser_session":
             return "WALLAPOP (NAVEGADOR)"
+        if self.provider == INTEGRATION_OFFICIAL:
+            return "WALLAPOP · API OFICIAL"
         return "WALLAPOP REAL"
+
+    @property
+    def is_direct(self) -> bool:
+        """True si las peticiones van directas al servicio (sin navegador)."""
+        return not self.demo and self.provider in (INTEGRATION_PROFILE, INTEGRATION_OFFICIAL)
+
+    @property
+    def uses_browser(self) -> bool:
+        return not self.demo and self.provider == INTEGRATION_BROWSER
 
     @property
     def endpoint_map(self):
@@ -74,6 +89,13 @@ def _demo_backend(reason: str, missing: list[str] | None = None) -> WallapopBack
 
 
 INTEGRATION_BROWSER = "navegador"
+#: Conexión directa con la credencial de integración provisional autorizada.
+INTEGRATION_PROFILE = "perfil"
+#: Conexión directa con la API oficial de Wallapop (mismo motor, otro perfil).
+INTEGRATION_OFFICIAL = "oficial"
+INTEGRATION_DEMO = "demo"
+#: Modos que se pueden elegir desde la aplicación.
+INTEGRATION_MODES = (INTEGRATION_DEMO, INTEGRATION_PROFILE, INTEGRATION_OFFICIAL, INTEGRATION_BROWSER)
 
 
 def _browser_backend(
@@ -137,6 +159,7 @@ def _browser_backend(
         profile=empty_profile(),
         auth_method=auth_method,
         demo=False,
+        provider=INTEGRATION_BROWSER,
         reason=(
             "Integración mediante navegador con sesión iniciada por el usuario "
             "(uso personal autorizado)."
@@ -163,27 +186,43 @@ def build_backend(
     # Lo que el usuario elige en Configuración → Wallapop manda sobre el
     # LOT_BOT_DEMO_MODE del .env (el .env de ejemplo trae «true» y, si no,
     # la integración por navegador no se podría activar desde la pantalla).
-    if settings.demo_mode and chosen != INTEGRATION_BROWSER:
+    if settings.demo_mode and chosen not in (
+        INTEGRATION_BROWSER,
+        INTEGRATION_PROFILE,
+        INTEGRATION_OFFICIAL,
+    ):
         return _demo_backend("Modo DEMO activado en la configuración.")
 
     # --- 1b. Integración por navegador ---
     if chosen == INTEGRATION_BROWSER:
         return _browser_backend(settings, account_manager, launcher)
 
-    # --- 2. Perfil de acceso ---
-    profile_path = settings.access_profile_path
+    if chosen == INTEGRATION_DEMO:
+        return _demo_backend("Modo DEMO elegido en «Conectar Wallapop».")
+
+    # --- 2. Perfil de acceso (provisional u oficial: mismo formato) ---
+    official = chosen == INTEGRATION_OFFICIAL
+    provider = INTEGRATION_OFFICIAL if official else INTEGRATION_PROFILE
+    if official:
+        profile_path = settings.official_profile_path
+        variable, example = "WALLAPOP_OFFICIAL_PROFILE", "config/official_api.example.yaml"
+        what = "de la API oficial de Wallapop"
+    else:
+        profile_path = settings.access_profile_path
+        variable, example = "WALLAPOP_ACCESS_PROFILE", "config/access_profile.example.yaml"
+        what = "de acceso autorizado"
     if profile_path is None:
         return _demo_backend(
-            "No se ha indicado ningún perfil de acceso autorizado.",
+            f"No se ha indicado ningún perfil {what}.",
             [
-                "La variable WALLAPOP_ACCESS_PROFILE debe apuntar al fichero con el "
-                "acceso que Wallapop te haya autorizado."
+                f"La variable {variable} debe apuntar al fichero con el acceso que "
+                f"Wallapop te haya autorizado (plantilla: {example})."
             ],
         )
     if not profile_path.is_file():
         return _demo_backend(
-            f"No se encuentra el perfil de acceso en «{profile_path}».",
-            [f"Crear el fichero {profile_path} a partir de config/access_profile.example.yaml."],
+            f"No se encuentra el perfil {what} en «{profile_path}».",
+            [f"Crear el fichero {profile_path} a partir de {example}."],
         )
 
     profile = AccessProfile.load(profile_path)
@@ -220,11 +259,14 @@ def build_backend(
         )
     account_manager.set_auth_method(auth_method)
 
+    if profile.limits.user_agent:
+        profile.transport.default_headers.setdefault("User-Agent", profile.limits.user_agent)
     service = AuthorizedWallapopService(
         endpoint_map=profile.transport,
         credential_provider=account_manager.credential_provider(),
         auth_method_name=auth_method.describe(),
     )
+    service.idempotency_header = profile.limits.idempotency_header
 
     granted = service.capabilities()
     not_granted = sorted(c.value for c in Capability if c not in granted)
@@ -238,8 +280,10 @@ def build_backend(
         profile=profile,
         auth_method=auth_method,
         demo=False,
+        provider=provider,
         reason=(
-            f"Acceso autorizado activo mediante «{auth_method.describe()}» "
+            ("API oficial de Wallapop: " if official else "")
+            + f"Acceso autorizado activo mediante «{auth_method.describe()}» "
             f"({len(granted)} operaciones disponibles)."
         ),
         missing=[

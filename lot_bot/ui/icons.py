@@ -41,6 +41,13 @@ SHAPES: dict[str, str] = {
     "productos": (
         '<path d="M4 8 12 4l8 4v8.5L12 20.5 4 16.5z"/><path d="M4 8l8 4 8-4"/><path d="M12 12v8.5"/>'
     ),
+    "conectar": (
+        '<path d="M9.5 14.5l5-5"/><path d="M11 6.5l1.6-1.6a3.5 3.5 0 0 1 5 5L16 11.5"/>'
+        '<path d="M13 17.5l-1.6 1.6a3.5 3.5 0 0 1-5-5L8 12.5"/>'
+    ),
+    "masiva": (
+        '<rect x="4" y="13" width="16" height="6.5" rx="1.6"/><path d="M6 9.5h12"/><path d="M8 6h8"/>'
+    ),
     "historial": '<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
     "logs": '<path d="M12 4 20.5 19H3.5z"/><path d="M12 10v4"/><path d="M12 16.6v.1"/>',
 }
